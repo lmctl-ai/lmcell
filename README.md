@@ -53,7 +53,7 @@ savedsl(p, "tissue.dslb");
 system ${dsl_cli(p)} --dsl tissue.dslb;
 ```
 
-Run `lmscript tissue.lms`; it finds lmcell on PATH or downloads the release. No XML or other runtime data is required. The host accepts only `--dsl FILE...`, `--dry-run --dsl FILE...`, `--version`, `--notices`, `--dsl-schema [--json]` and `--dsl-signatures`. Dry run verifies bytecode without running or writing outputs. Usage exits 2; load/run errors exit 3.
+Run a gallery autorun command above; it installs the required hosts automatically. No XML or other runtime data is required. The host accepts only `--dsl FILE...`, `--dry-run --dsl FILE...`, `--version`, `--notices`, `--dsl-schema [--json]` and `--dsl-signatures`. Dry run verifies bytecode without running or writing outputs. Usage exits 2; load/run errors exit 3.
 
 | API | Purpose |
 | --- | --- |
