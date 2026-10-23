@@ -1,0 +1,8 @@
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(12345);
+s.cell_type("growing").cycle(0.3).radius(1.0);
+let r=s.seed("growing",2000,0.0,0.0).run(2.0,0.01);
+cell.assert_close(float(r.live()),cell.eval("2000*exp(0.6)"),190.0);
+cell.assert_true(r.counts().rows()==201);
+end _dsl_
+savedsl(p, "build/growth_and_death.dslb");

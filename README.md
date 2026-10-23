@@ -1,0 +1,68 @@
+# lmcell
+
+Seeded multicellular simulations for lmscript in one static executable. PhysiCell 1.14.2 supplies cell objects, live-cycle and apoptosis models and persistent motility; BioFVM supplies substrate diffusion, decay and cell exchange. The MIT host coordinates a deliberately limited, noninteracting 2D agent model with Hill feedback and CSV output for [lmplot](https://github.com/lmctl-ai/lmplot).
+
+[![CI](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml/badge.svg)](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml)
+
+```lmscript
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s = cell.sim(7).substrate("oxygen", 1.0, 0.1, 1.0, -1.0);
+s.cell_type("walker").radius(1.0).motility(1.0, 2.0);
+let r = s.seed("walker", 100, 0.0, 0.0).run(10.0, 0.05);
+cell.assert_true(r.live() == 100);
+r.counts().save_csv("counts.csv");
+r.cells().save_csv("cells.csv");
+r.profiles().save_csv("oxygen.csv");
+end _dsl_
+savedsl(p, "tissue.dslb");
+system ${dsl_cli(p)} --dsl tissue.dslb;
+```
+
+Run `lmscript tissue.lms`; it finds lmcell on PATH or downloads the release. No XML or other runtime data is required. The host accepts only `--dsl FILE...`, `--dry-run --dsl FILE...`, `--version`, `--notices`, `--dsl-schema [--json]` and `--dsl-signatures`. Dry run verifies bytecode without running or writing outputs. Usage exits 2; load/run errors exit 3.
+
+| API | Purpose |
+| --- | --- |
+| `cell.sim(seed)` | seeded simulation builder; seed in 0..4294967295 |
+| `sim.domain(xmin,xmax,ymin,ymax,voxel_size)` | rectangular 2D domain with integer spacing counts; default -100..100 in both axes, spacing 20 |
+| `sim.substrate(name,D,decay,initial,boundary)` | uniform initial concentration, nonnegative diffusion/decay; boundary -1 means no flux, otherwise fixed edge-voxel concentration |
+| `sim.cell_type(name)` | named phenotype builder |
+| `type.cycle(rate)`, `.death(rate)` | stochastic one-phase live-cycle division and apoptosis rates |
+| `type.radius(r)` | cell radius determining volume for exchange |
+| `type.motility(speed,persistence_time)` | unbiased persistent random walk |
+| `type.exchange(substrate,uptake,secretion)` | one exchanged substrate per type; secretion saturation concentration 1 |
+| `type.rule(substrate,effect,target,half_max,hill)` | per-type Hill modulation; effect `increases` or `decreases`, target `cycle entry`, `apoptosis` or `migration speed` |
+| `sim.seed(type_name,count,x,y)` | add colocated agents; repeated calls support arbitrary placements |
+| `sim.run(duration,max_dt)` | freeze builder and run once, returning an immutable result |
+| `result.live()`, `.substrate(index)` | final live population and substrate names |
+| `result.counts()`, `.cells()`, `.profiles()` | output matrices |
+| `matrix.rows()`, `.cols()`, `.get(row,col)`, `.save_csv(path)` | zero-based matrix access and deterministic numeric CSV |
+| `cell.eval("expression")`, `.assert_close(a,b,absolute_tolerance)`, `.assert_true(bool)` | scalar math and script assertions |
+
+CSV has no header and uses 17-digit precision. Count columns are `time,live`. Cell columns are `x,y,type_index,alive`; apoptotic cells remain until their upstream clearance time, with alive=0. Profile columns are `x,y` then substrates in declaration order. A substrate-free run still has profile coordinates but no concentration columns. Grid rows use BioFVM's x-fastest ordering.
+
+## Model and limits
+
+Units follow PhysiCell: micrometers and minutes; rates are per minute and diffusion coefficients are square micrometers per minute. Concentration units are caller-defined. Volume is spherical `4*pi*r^3/3`, even in the one-voxel-thick 2D domain. Exchange scales with cell volume divided by voxel volume. No automatic unit conversion is performed.
+
+The host advances upstream cycle/death and motility components with a fixed step at most the requested `max_dt`, uniformly subdividing the duration to end exactly. It runs BioFVM's implicit 2D LOD diffusion-decay solver after cell sources/sinks. It uses its own coordinator rather than PhysiCell's full mechanical tissue loop: agents have no adhesion, repulsion, volume-growth kinetics or contact inhibition. Division makes a colocated daughter with the configured radius (instantaneous volume replenishment). These assumptions describe point agents, not resolved packed tissue. Cells reflect at domain boundaries. No arbitrary callback, upstream XML/rules-file import, or intracellular model is exposed.
+
+The Hill response is `H=s^n/(K^n+s^n)`. Increasing multiplies the baseline behavior by `1+H`; decreasing multiplies it by `1-H`. Multiple rules multiply, and each step starts from the type baseline. This is a limited builder-defined rule convention, not the complete upstream Hypothesis Rulesets grammar. Rate times step must remain at most 0.1; use smaller steps for convergence. Diffusion edge constraints apply at voxel centers; use refined spatial/temporal resolution for boundary accuracy. A single-row domain pins only its x edges.
+
+PhysiCell/BioFVM have process-wide caches: **one simulation may run per process**, including across multiple bytecode files. Use separate host processes for parameter ensembles. Repeated fixed-seed runs produce byte-identical CSV on the same platform. Cross-platform stochastic trajectories are not promised identical because upstream uses standard-library distributions. Physics checks use tolerances. Builders/results remain alive until process exit and explicit grid, step, population and object limits bound allocations.
+
+## Build and verification
+
+```sh
+scripts/sync-deps.sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 4
+./test.sh
+```
+
+Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lmctl-ai/lmctl@0.2.369`). OpenMP is disabled through a tiny serial compatibility header. Linux links fully statically; macOS uses only system libraries; Windows links MinGW runtimes statically. Dependencies are pinned in `deps.lock` and fetched into ignored `third_party/`.
+
+Tests compare populations with exponential birth/death laws, Hill-modulated death, persistent-walk MSD and isotropy, diffusion-decay steady penetration, and volume-normalized uptake. Nine native scenarios and eight DSL programs also check validation, partial duration, matrices, multiple substrates and deterministic exports. `test.sh` checks pins, schema/compiler/registry parity, notices, static linking, usage/error codes and dry runs. [Durable memory](durable-memory/index.md) records numerical details and release evidence.
+
+## License
+
+The host is [MIT](LICENSE). PhysiCell and BioFVM are BSD-3-Clause; bundled pugixml and the scripting SDK are MIT. Their notices are embedded in `lmcell --notices` and included in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES). MaBoSS, PhysiBoSS, RoadRunner and GPL/LGPL dependencies are excluded. CMake creates a build-only BioFVM copy that removes premature global-options writes, and the wrapper initializes a field omitted by an upstream copy constructor; the pinned checkout stays unmodified. See [license and integration decisions](durable-memory/02-libraries-and-licenses.md).

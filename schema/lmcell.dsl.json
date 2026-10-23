@@ -1,0 +1,240 @@
+{
+  "dsl.schema": 2,
+  "name": "lmcell",
+  "types": {
+    "Cell": {
+      "methods": {
+        "sim": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "eval": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "float"
+          }
+        ],
+        "assert_close": [
+          {
+            "params": [
+              "float",
+              "float",
+              "float"
+            ],
+            "returns": "void"
+          }
+        ],
+        "assert_true": [
+          {
+            "params": [
+              "bool"
+            ],
+            "returns": "void"
+          }
+        ],
+        "print": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ]
+      }
+    },
+    "Sim": {
+      "methods": {
+        "domain": [
+          {
+            "params": [
+              "float",
+              "float",
+              "float",
+              "float",
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "substrate": [
+          {
+            "params": [
+              "string",
+              "float",
+              "float",
+              "float",
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "cell_type": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "CellType"
+          }
+        ],
+        "seed": [
+          {
+            "params": [
+              "string",
+              "int",
+              "float",
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "run": [
+          {
+            "params": [
+              "float",
+              "float"
+            ],
+            "returns": "Result"
+          }
+        ]
+      }
+    },
+    "CellType": {
+      "methods": {
+        "cycle": [
+          {
+            "params": [
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ],
+        "death": [
+          {
+            "params": [
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ],
+        "radius": [
+          {
+            "params": [
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ],
+        "motility": [
+          {
+            "params": [
+              "float",
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ],
+        "exchange": [
+          {
+            "params": [
+              "string",
+              "float",
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ],
+        "rule": [
+          {
+            "params": [
+              "string",
+              "string",
+              "string",
+              "float",
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ]
+      }
+    },
+    "Result": {
+      "methods": {
+        "counts": [
+          {
+            "params": [],
+            "returns": "Matrix"
+          }
+        ],
+        "cells": [
+          {
+            "params": [],
+            "returns": "Matrix"
+          }
+        ],
+        "profiles": [
+          {
+            "params": [],
+            "returns": "Matrix"
+          }
+        ],
+        "live": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "substrate": [
+          {
+            "params": [
+              "int"
+            ],
+            "returns": "string"
+          }
+        ]
+      }
+    },
+    "Matrix": {
+      "methods": {
+        "rows": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "cols": [
+          {
+            "params": [],
+            "returns": "int"
+          }
+        ],
+        "get": [
+          {
+            "params": [
+              "int",
+              "int"
+            ],
+            "returns": "float"
+          }
+        ],
+        "save_csv": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "void"
+          }
+        ]
+      }
+    }
+  },
+  "functions": {},
+  "context": {
+    "cell": "Cell"
+  }
+}

@@ -1,0 +1,10 @@
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(17).substrate("drug",0.0,0.25,2.0,-1.0);
+s.cell_type("quiescent").radius(1.0);
+let r=s.seed("quiescent",1,0.0,0.0).run(2.0,0.01);
+cell.assert_true(r.live()==1);
+cell.assert_close(r.cells().get(0,0),0.0,0.0);
+cell.assert_close(r.profiles().get(0,2),cell.eval("2*exp(-0.5)"),0.0005);
+cell.assert_true(r.substrate(0)=="drug");
+end _dsl_
+savedsl(p, "build/decay_and_baseline.dslb");
