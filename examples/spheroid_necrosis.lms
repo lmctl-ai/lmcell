@@ -60,13 +60,13 @@ plot.cmd("plot 'build/examples/spheroid_field.csv' using 1:2:3 with image notitl
 plot.cmd("unset colorbox; unset cblabel; set key noreverse Right");
 # B: radial profiles
 plot.cmd("set lmargin at screen 0.535; set rmargin at screen 0.745; set tmargin at screen 0.84; set bmargin at screen 0.13");
-plot.cmd("set size noratio; set autoscale; set xrange [0:300]; set yrange [0:1.05]");
+plot.cmd("set size noratio; set autoscale; set xrange [0:300]; set yrange [0:1.2]");
 plot.cmd("set xtics 100; set ytics 0.25");
 plot.cmd("set grid back lc rgb '#e4e9ef'");
 plot.cmd("set title 'Along the radius'");
 plot.cmd("set xlabel 'Distance from centre (micrometers)'; set ylabel 'Level (0 to 1)' offset 0.5,0");
-plot.cmd("set key at 10,1.0 left top Left reverse samplen 2 font ',10' nobox noopaque");
-plot.cmd("set object 1 rect from 200,0 to 300,1.05 fc rgb '#f3f5f8' fs solid noborder behind");
+plot.cmd("set key at 10,1.18 left top Left reverse samplen 2 font ',10' nobox noopaque");
+plot.cmd("set object 1 rect from 200,0 to 300,1.2 fc rgb '#f3f5f8' fs solid noborder behind");
 plot.cmd("set label 1 'no cells' at 250,0.15 center tc rgb '#8a8f98' font ',10'");
 plot.cmd("bin(r)=20*floor(r/20)+10");
 plot.cmd("plot 'build/examples/spheroid_field.csv' using (bin(sqrt($1**2+$2**2))):3 smooth unique with lines lc rgb '#34558a' lw 3 title 'nutrient', 'build/examples/spheroid_cells.csv' using (bin(sqrt($1**2+$2**2))):4 smooth unique with linespoints pt 7 ps 0.6 lc rgb '#f08a24' lw 3 title 'live fraction'");
