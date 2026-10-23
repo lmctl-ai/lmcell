@@ -58,6 +58,76 @@ int main(int argc, char **argv) {
       } catch (const std::runtime_error &) {
         ++checks;
       }
+    } else if (mode == "increase") {
+      // Oxygen at half-max with an increasing rule multiplies cycle by 1.5.
+      constexpr int n = 10000;
+      t.cycle_rate = .3;
+      c.substrates.push_back({"oxygen", 0, 0, 1, -1});
+      c.rules.push_back({"oxygen", "increases", "cycle entry", 1, 2, 0});
+      c.types.push_back(t);
+      for (int i = 0; i < n; ++i)
+        c.seeds.push_back({0, 0, 0});
+      auto r = run(c);
+      const double factor = std::exp(.45 * 2);
+      near(r.counts.at(r.counts.rows - 1, 1), n * factor,
+           3 * std::sqrt(n * factor * (factor - 1)) + n * .005,
+           "increasing Hill rule at half-max scales cycle rate by 1.5");
+      std::cout << "increase final=" << r.counts.at(r.counts.rows - 1, 1)
+                << " expected=" << n * factor << '\n';
+    } else if (mode == "secretion") {
+      // One cell: drho/dt = c*(S*(1-rho) - U*rho), c = Vcell/Vvoxel.
+      c.xmin = 0;
+      c.xmax = 10;
+      c.ymin = 0;
+      c.ymax = 10;
+      c.voxel_size = 10;
+      c.dt = .01;
+      c.substrates.push_back({"signal", 0, 0, 0, -1});
+      t.radius = 2;
+      t.substrate = "signal";
+      t.secretion_rate = 3;
+      t.uptake_rate = 1;
+      c.types.push_back(t);
+      c.seeds.push_back({5, 5, 0});
+      c.duration = 20;
+      auto r = run(c);
+      const double cv = 4.0 / 3 * 3.14159265358979323846 * 8 / 1000;
+      const double a = c.dt * cv;
+      // Implicit upstream step: rho' = (rho + a*S) / (1 + a*(S+U)).
+      double rho = 0;
+      for (int i = 0; i < 2000; ++i)
+        rho = (rho + a * 3) / (1 + a * 4);
+      near(r.profiles.at(0, 2), rho, 1e-12, "implicit secretion/uptake step");
+      near(r.profiles.at(0, 2), .75 * (1 - std::exp(-4 * cv * 20)), 2e-4,
+           "secretion/uptake relaxation to S/(S+U)");
+    } else if (mode == "speed") {
+      // A decreasing migration-speed rule at half-max halves speed: MSD/4.
+      constexpr int n = 4000;
+      c.duration = 20;
+      c.dt = .05;
+      t.motility_speed = 1;
+      t.persistence_time = 1;
+      c.substrates.push_back({"cue", 0, 0, 1, -1});
+      c.rules.push_back({"cue", "decreases", "migration speed", 1, 1, 0});
+      c.types.push_back(t);
+      for (int i = 0; i < n; ++i)
+        c.seeds.push_back({0, 0, 0});
+      auto r = run(c);
+      double sum = 0, sum2 = 0;
+      for (size_t i = 0; i < r.cells.rows; ++i) {
+        double q = r.cells.at(i, 0) * r.cells.at(i, 0) +
+                   r.cells.at(i, 1) * r.cells.at(i, 1);
+        sum += q;
+        sum2 += q * q;
+      }
+      double msd = sum / n, se = std::sqrt((sum2 / n - msd * msd) / n);
+      double expected = 400;
+      for (int k = 1; k < 400; ++k)
+        expected += 2 * (400 - k) * std::pow(1 - c.dt, k);
+      expected *= .25 * c.dt * c.dt;
+      near(msd, expected, 3 * se, "half-speed persistent walk MSD");
+      std::cout << "speed MSD=" << msd << " expected=" << expected
+                << " SE=" << se << '\n';
     } else if (mode == "growth" || mode == "death" || mode == "rules") {
       constexpr int n = 10000;
       c.duration = 2;
@@ -127,7 +197,11 @@ int main(int argc, char **argv) {
       c.duration = 1000;
       c.dt = .01;
       c.substrates.push_back({"oxygen", 1, .01, 0, 1});
+      // A no-flux, nondecaying companion must not inherit the fixed edges.
+      c.substrates.push_back({"inert", 1, 0, 2, -1});
       auto r = run(c);
+      for (size_t i = 0; i < r.profiles.rows; ++i)
+        near(r.profiles.at(i, 3), 2, 1e-9, "no-flux substrate beside Dirichlet");
       double k = .1, L = 199;
       for (size_t i = 0; i < r.profiles.rows; ++i) {
         double x = r.profiles.at(i, 0) - .5;
