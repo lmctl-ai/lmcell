@@ -2,6 +2,10 @@
 
 Agent-based cell biology in one command: tumours that starve, wounds that close, drugs that fail to penetrate, cells that follow gradients. PhysiCell and BioFVM compute; lmplot, lmdraw and lmblender draw.
 
+[![CI](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml/badge.svg)](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/lmctl-ai/lmcell?label=release)](https://github.com/lmctl-ai/lmcell/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 ### Tumours and therapy
 
 | Starving tumour: dead core, live rim | The same tumour, path-traced | Drugs stop a few cell layers from the vessel |
@@ -117,8 +121,6 @@ exhausting the machine. Set `LMCELL_MAX_MEMORY_MB` to change it, e.g.
 `LMCELL_MAX_MEMORY_MB=16384 lmscript tissue.lms`.
 
 ## Build and verification
-
-[![CI](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml/badge.svg)](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml)
 
 ```sh
 scripts/sync-deps.sh
