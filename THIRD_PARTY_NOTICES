@@ -94,6 +94,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+Toolchain runtime libraries
+The fully static Linux executables contain libstdc++ and libgcc (GPL v3 or
+later with the GCC Runtime Library Exception 3.1, which permits distributing
+binaries that statically incorporate the runtime without GPL obligations for
+the rest of the program; https://www.gnu.org/licenses/gcc-exception-3.1.html)
+and glibc (LGPL v2.1 or later, which permits static linking; source at
+https://www.gnu.org/software/libc/). Windows executables statically link the
+MinGW-w64 runtime and libstdc++/libgcc under the same runtime exception
+(https://www.mingw-w64.org/). macOS executables use only system libraries.
+
 lmcell does not include MaBoSS, PhysiBoSS, RoadRunner, or any other optional
 PhysiCell addon. The serial OpenMP compatibility header in cpp/serial/omp.h
 only supplies the two query functions used by the upstream serial build;

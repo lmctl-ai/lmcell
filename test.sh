@@ -35,15 +35,20 @@ ok "native cell regression tests"
 want_version="lmcell $(sed -n 's/^project(lmcell VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
 [ "$("$HOST" --version)" = "$want_version" ] || fail "--version is not exactly '$want_version'"
 ok "--version prints exactly '$want_version'"
-python3 scripts/gen-schema.py >/dev/null && git diff --quiet -- schema/lmcell.dsl.json 2>/dev/null || [ ! -d .git ] || fail "schema/lmcell.dsl.json is stale: run scripts/gen-schema.py"
+# Compare bytes directly: git worktrees (.git is a file) and tarballs must not skip this.
+cp schema/lmcell.dsl.json "$WORK/schema.before"
+python3 scripts/gen-schema.py >/dev/null || fail "scripts/gen-schema.py"
+cmp -s "$WORK/schema.before" schema/lmcell.dsl.json || fail "schema/lmcell.dsl.json was stale (now regenerated): rebuild and commit it"
 ok "schema matches the registrations in cpp/main.cpp"
 "$HOST" --dsl-schema --json >"$WORK/schema.json" || fail "embedded schema print"
 cmp -s "$WORK/schema.json" schema/lmcell.dsl.json || fail "embedded schema differs from schema/lmcell.dsl.json"
 ok "--dsl-schema --json prints byte-identical embedded schema bytes"
 diff -u <("$LMSCRIPT" --dsl-signatures schema/lmcell.dsl.json) <("$HOST" --dsl-signatures) || fail "host/compiler signatures differ"
 ok "host registry matches compiler signatures"
-"$HOST" --notices | grep -q "PhysiCell" || fail "--notices missing third-party text"
-ok "--notices prints the third-party license texts"
+"$HOST" --notices >"$WORK/notices.txt" || fail "--notices"
+cmp -s "$WORK/notices.txt" THIRD_PARTY_NOTICES || fail "--notices differs from THIRD_PARTY_NOTICES"
+for want in PhysiCell BioFVM pugixml cpp-dsl-sdk; do grep -q "$want" "$WORK/notices.txt" || fail "--notices lacks $want"; done
+ok "--notices prints THIRD_PARTY_NOTICES byte for byte"
 
 case "$UNAME_S" in
   Linux) if ldd "$HOST" >/dev/null 2>&1; then fail "executable is dynamically linked"; fi; ok "executable is fully static (no dynamic loader)";;
