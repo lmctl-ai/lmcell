@@ -5,6 +5,34 @@ end _dsl_
 savedsl(p, "build/uptake_load.dslb");
 r = system ${dsl_cli(p)} --dsl build/uptake_load.dslb;
 assert(r.code == 0);
-r = system bash examples/render-one.sh uptake_load;
-println(r.stdout);
-assert(r.code == 0);
+
+mkdir("build/visual");
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/uptake_load.png",900,520);
+plot.cmd("set datafile separator ','");
+plot.cmd("set border 3");
+plot.cmd("set lmargin 14");
+plot.cmd("set rmargin 4");
+plot.cmd("set tics nomirror");
+plot.cmd("set grid back lc rgb '#e4e9ef'");
+plot.cmd("set key outside top center horizontal");
+plot.cmd("set style line 1 lc rgb '#007f86' lw 3");
+plot.cmd("set style line 2 lc rgb '#df6b38' lw 3");
+plot.cmd("set style line 3 lc rgb '#5864a8' lw 3");
+plot.cmd("set title 'Cell loading controls nutrient depletion after 20 minutes'");
+plot.cmd("set xlabel 'Cells per voxel'");
+plot.cmd("set ylabel 'Fraction of substrate remaining'");
+plot.cmd("set xrange [-0.5:9.5]");
+plot.cmd("set yrange [0:1.05]");
+plot.cmd("set xtics 0,1,9");
+plot.cmd("set boxwidth 0.7");
+plot.cmd("set style fill solid 0.7");
+plot.cmd("plot 'build/examples/uptake_load.csv' using (($1-5)/10):3 with boxes lc rgb '#007f86' title 'BioFVM uptake', exp(-2*(4*pi/3)/1000*20*x) with lines ls 2 title 'Continuum expectation'");
+plot.close();
+end _dsl_
+savedsl(v,"build/visual/uptake_load.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/uptake_load.dslb;
+assert(r.code==0);
+
+println("wrote images/uptake_load.png");

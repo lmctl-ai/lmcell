@@ -5,6 +5,29 @@ end _dsl_
 savedsl(p, "build/apoptosis_loss.dslb");
 r = system ${dsl_cli(p)} --dsl build/apoptosis_loss.dslb;
 assert(r.code == 0);
-r = system bash examples/render-one.sh apoptosis_loss;
-println(r.stdout);
-assert(r.code == 0);
+
+mkdir("build/visual");
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/apoptosis_loss.png",900,520);
+plot.cmd("set datafile separator ','");
+plot.cmd("set border 3");
+plot.cmd("set lmargin 14");
+plot.cmd("set rmargin 4");
+plot.cmd("set tics nomirror");
+plot.cmd("set grid back lc rgb '#e4e9ef'");
+plot.cmd("set key outside top center horizontal");
+plot.cmd("set style line 1 lc rgb '#007f86' lw 3");
+plot.cmd("set style line 2 lc rgb '#df6b38' lw 3");
+plot.cmd("set style line 3 lc rgb '#5864a8' lw 3");
+plot.cmd("set title 'Apoptosis: independent cell loss gives exponential survival'");
+plot.cmd("set xlabel 'Time (minutes)'");
+plot.cmd("set ylabel 'Live cells'");
+plot.cmd("plot 'build/examples/apoptosis_loss.csv' using 1:2 with lines ls 1 title 'Seeded agents', 5000*exp(-0.3*x) with lines ls 2 dt 2 title 'Expected survival'");
+plot.close();
+end _dsl_
+savedsl(v,"build/visual/apoptosis_loss.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/apoptosis_loss.dslb;
+assert(r.code==0);
+
+println("wrote images/apoptosis_loss.png");
