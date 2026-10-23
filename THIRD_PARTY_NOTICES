@@ -1,4 +1,4 @@
-lmcell includes source from the following permissively licensed projects.
+lmcell 0.1.2 includes source from the following permissively licensed projects.
 
 PhysiCell (pinned in deps.lock)
 Copyright (c) 2016-2021, Paul Macklin and the PhysiCell Project.
