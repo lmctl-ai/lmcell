@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <iostream>
 #include <set>
 #include <stdexcept>
 
@@ -331,8 +332,15 @@ Results run(const Config &cfg) {
     for (auto *c : *all_cells) {
       c->set_internal_uptake_constants(dt);
       c->phenotype.secretion.advance(c, c->phenotype, dt);
+#ifdef _WIN32
+      if(step==0 && !cfg.types.empty() && cfg.types[0].substrate=="food")
+        std::cerr<<"exchange diagnostic active="<<c->is_active<<" volume="<<c->phenotype.volume.total<<" index="<<c->get_current_voxel_index()<<" uptake="<<(*c->uptake_rates)[0]<<" rho="<<c->nearest_density_vector()[0]<<" grid="<<microenvironment.mesh.x_coordinates.size()<<","<<microenvironment.mesh.y_coordinates.size()<<","<<microenvironment.mesh.z_coordinates.size()<<"\n";
+#endif
     }
     microenvironment.simulate_diffusion_decay(dt);
+#ifdef _WIN32
+    if(step==0 && !cfg.types.empty() && cfg.types[0].substrate=="food")std::cerr<<"exchange after diffusion="<<microenvironment.density_vector(0)[0]<<"\n";
+#endif
     time = std::min(cfg.duration, (step + 1) * fixed_dt);
     sample(time);
   }
