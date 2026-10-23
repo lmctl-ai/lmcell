@@ -3,6 +3,7 @@
 #include "PhysiCell.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <memory>
 #include <set>
 #include <stdexcept>
@@ -126,6 +127,12 @@ Results run(const Config &cfg) {
     throw std::runtime_error(
         "lmcell supports one PhysiCell simulation per process");
   used = true; // Failed native initialization also consumes the global state.
+  // Upstream reports progress on std::cout (for example the selected solver).
+  // Host stdout carries only the JSON result line, so route it to stderr.
+  struct CoutToCerr {
+    std::streambuf *old = std::cout.rdbuf(std::cerr.rdbuf());
+    ~CoutToCerr() { std::cout.rdbuf(old); }
+  } quiet_stdout;
   microenvironment.name = "lmcell";
   set_default_microenvironment(&microenvironment);
   default_microenvironment_options.simulate_2D = true;

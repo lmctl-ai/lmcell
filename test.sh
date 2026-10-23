@@ -76,8 +76,10 @@ for src in tests/*.lms examples/*.lms; do
   name="$(basename "$src" .lms)"
   "$HOST" --dsl "build/$name.dslb" >"$WORK/$name.out" 2>"$WORK/$name.err" || { cat "$WORK/$name.out" "$WORK/$name.err" >&2; fail "$name run"; }
   grep -q '"ok": true' "$WORK/$name.out" || { cat "$WORK/$name.out" >&2; fail "$name did not report ok"; }
+  # No program prints, so stdout must be exactly the JSON result (no upstream chatter).
+  [ "$(tr -d '\r' <"$WORK/$name.out")" = '{"ok": true, "result": null}' ] || { cat "$WORK/$name.out" >&2; fail "$name stdout is not only the JSON result"; }
 done
-ok "$n programs run and pass their own assertions"
+ok "$n programs run, pass their own assertions and keep stdout to the JSON result"
 
 # Determinism: the CSV files the examples write are identical on rerun.
 for f in build/examples/*.csv; do echo "$(sha "$f") $f"; done >"$WORK/before.txt"
