@@ -1,3 +1,4 @@
+mkdir("build/examples");
 p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(7).domain(0.0,60.0,0.0,40.0,10.0).substrate("oxygen",1.0,0.1,1.0,-1.0);
 s.cell_type("cell").radius(1.0);
@@ -9,3 +10,6 @@ r.profiles().save_csv("build/examples/tissue_decay_profiles.csv");
 end _dsl_
 savedsl(p, "build/tissue_decay.dslb");
 system ${dsl_cli(p)} --dsl build/tissue_decay.dslb;
+r = system bash examples/render-one.sh tissue_decay;
+println(r.stdout);
+assert(r.code == 0);

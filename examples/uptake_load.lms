@@ -1,0 +1,10 @@
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(2).domain(0.0,100.0,0.0,10.0,10.0).substrate("food",0.0,0.0,1.0,-1.0);s.cell_type("consumer").radius(1.0).exchange("food",2.0,0.0);for(i in range(0,10)){s.seed("consumer",i,10.0*float(i)+5.0,5.0);}let r=s.run(20.0,0.05);cell.assert_close(r.profiles().get(9,2),cell.eval("exp(-2*(4*pi/3)/1000*9*20)"),0.001);r.profiles().save_csv("build/examples/uptake_load.csv");
+end _dsl_
+savedsl(p, "build/uptake_load.dslb");
+r = system ${dsl_cli(p)} --dsl build/uptake_load.dslb;
+assert(r.code == 0);
+r = system bash examples/render-one.sh uptake_load;
+println(r.stdout);
+assert(r.code == 0);

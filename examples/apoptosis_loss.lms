@@ -1,0 +1,10 @@
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(12345);s.cell_type("dying").death(0.3).radius(1.0);let r=s.seed("dying",5000,0.0,0.0).run(2.0,0.01);cell.assert_close(float(r.live()),cell.eval("5000*exp(-0.6)"),120.0);r.counts().save_csv("build/examples/apoptosis_loss.csv");
+end _dsl_
+savedsl(p, "build/apoptosis_loss.dslb");
+r = system ${dsl_cli(p)} --dsl build/apoptosis_loss.dslb;
+assert(r.code == 0);
+r = system bash examples/render-one.sh apoptosis_loss;
+println(r.stdout);
+assert(r.code == 0);

@@ -1,0 +1,10 @@
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(12345);s.cell_type("growing").cycle(0.3).radius(1.0);let r=s.seed("growing",2000,0.0,0.0).run(2.0,0.01);cell.assert_close(float(r.live()),cell.eval("2000*exp(0.6)"),190.0);r.counts().save_csv("build/examples/growth_birth.csv");
+end _dsl_
+savedsl(p, "build/growth_birth.dslb");
+r = system ${dsl_cli(p)} --dsl build/growth_birth.dslb;
+assert(r.code == 0);
+r = system bash examples/render-one.sh growth_birth;
+println(r.stdout);
+assert(r.code == 0);

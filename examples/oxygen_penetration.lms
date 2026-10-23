@@ -1,0 +1,10 @@
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(1).domain(0.0,200.0,0.0,1.0,1.0).substrate("oxygen",1.0,0.01,0.0,1.0);let r=s.run(1000.0,0.01);cell.assert_close(r.profiles().get(10,2),cell.eval("exp(-1)"),0.0015);r.profiles().save_csv("build/examples/oxygen_penetration.csv");
+end _dsl_
+savedsl(p, "build/oxygen_penetration.dslb");
+r = system ${dsl_cli(p)} --dsl build/oxygen_penetration.dslb;
+assert(r.code == 0);
+r = system bash examples/render-one.sh oxygen_penetration;
+println(r.stdout);
+assert(r.code == 0);

@@ -1,3 +1,4 @@
+mkdir("build/examples");
 p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(12345).substrate("oxygen",0.0,0.0,1.0,-1.0);
 s.cell_type("sensitive").death(0.3).radius(1.0).rule("oxygen","decreases","apoptosis",1.0,2.0);
@@ -8,3 +9,6 @@ r.cells().save_csv("build/examples/oxygen_cells.csv");
 end _dsl_
 savedsl(p, "build/oxygen_rules.dslb");
 system ${dsl_cli(p)} --dsl build/oxygen_rules.dslb;
+r = system bash examples/render-one.sh oxygen_rules;
+println(r.stdout);
+assert(r.code == 0);

@@ -1,0 +1,10 @@
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(54321);s.cell_type("walker").motility(1.0,1.0).radius(1.0);let r=s.seed("walker",3000,0.0,0.0).run(20.0,0.05);cell.assert_true(r.live()==3000);r.cells().save_csv("build/examples/persistent_swarm.csv");
+end _dsl_
+savedsl(p, "build/persistent_swarm.dslb");
+r = system ${dsl_cli(p)} --dsl build/persistent_swarm.dslb;
+assert(r.code == 0);
+r = system bash examples/render-one.sh persistent_swarm;
+println(r.stdout);
+assert(r.code == 0);

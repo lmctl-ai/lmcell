@@ -1,5 +1,36 @@
 # lmcell
 
+Seeded cell populations, persistent motility and substrate transport, computed with PhysiCell/BioFVM and drawn with lmplot.
+
+| Oxygen feedback slows cell loss | Cell division amplifies a population | Apoptosis leaves an exponential survival curve |
+| --- | --- | --- |
+| ![Oxygen feedback slows cell loss](docs/images/oxygen_rules.png) | ![Cell division amplifies a population](docs/images/growth_birth.png) | ![Apoptosis leaves an exponential survival curve](docs/images/apoptosis_loss.png) |
+| [Oxygen feedback slows cell loss](examples/oxygen_rules.lms) | [Cell division amplifies a population](examples/growth_birth.lms) | [Apoptosis leaves an exponential survival curve](examples/apoptosis_loss.lms) |
+
+| Persistent walkers spread from one seed | Diffusion sets an oxygen penetration length | More cells consume more substrate |
+| --- | --- | --- |
+| ![Persistent walkers spread from one seed](docs/images/persistent_swarm.png) | ![Diffusion sets an oxygen penetration length](docs/images/oxygen_penetration.png) | ![More cells consume more substrate](docs/images/uptake_load.png) |
+| [Persistent walkers spread from one seed](examples/persistent_swarm.lms) | [Diffusion sets an oxygen penetration length](examples/oxygen_penetration.lms) | [More cells consume more substrate](examples/uptake_load.lms) |
+
+[Animated time cursor](docs/images/growth_birth.gif) · [Regenerate every figure](examples/render-all.sh)
+
+## Install and run
+
+Download a binary from [releases](https://github.com/lmctl-ai/lmcell/releases), or let the example binding install it. Run `lmscript examples/oxygen_rules.lms`. For figures, put `lmplot` on PATH or set `VISUALS_NETWORK=1`; `ffmpeg` creates the optional animation.
+
+## Gallery
+
+| Example | Result |
+| --- | --- |
+| [oxygen_rules.lms](examples/oxygen_rules.lms) | [Oxygen feedback slows cell loss](docs/images/oxygen_rules.png) |
+| [growth_birth.lms](examples/growth_birth.lms) | [Cell division amplifies a population](docs/images/growth_birth.png) |
+| [apoptosis_loss.lms](examples/apoptosis_loss.lms) | [Apoptosis leaves an exponential survival curve](docs/images/apoptosis_loss.png) |
+| [persistent_swarm.lms](examples/persistent_swarm.lms) | [Persistent walkers spread from one seed](docs/images/persistent_swarm.png) |
+| [oxygen_penetration.lms](examples/oxygen_penetration.lms) | [Diffusion sets an oxygen penetration length](docs/images/oxygen_penetration.png) |
+| [uptake_load.lms](examples/uptake_load.lms) | [More cells consume more substrate](docs/images/uptake_load.png) |
+| [secretion_signal.lms](examples/secretion_signal.lms) | [Cell loading builds a secreted signal](docs/images/secretion_signal.png) |
+| [tissue_decay.lms](examples/tissue_decay.lms) | [Uniform substrate decays without a gradient](docs/images/tissue_decay.png) |
+
 Seeded multicellular simulations for lmscript in one static executable. PhysiCell 1.14.2 supplies cell objects, live-cycle and apoptosis models and persistent motility; BioFVM supplies substrate diffusion, decay and cell exchange. The MIT host coordinates a deliberately limited, noninteracting 2D agent model with Hill feedback and CSV output for [lmplot](https://github.com/lmctl-ai/lmplot).
 
 [![CI](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml/badge.svg)](https://github.com/lmctl-ai/lmcell/actions/workflows/ci.yml)
