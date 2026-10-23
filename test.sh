@@ -122,7 +122,16 @@ expect_error unknown_expr 'cell.eval("unknown+1");' "unknown"
 expect_error assertfail 'cell.assert_close(1.0,2.0,0.1);' "assert_close"
 expect_error nan_assert 'cell.assert_close(sqrt(-1.0),0.0,0.1);' "assert_close"
 expect_error assert_true 'cell.assert_true(false);' "assert_true"
-ok "errors stop with exit 3 and clear messages (15 cases)"
+expect_error exchange_twice 'let s=cell.sim(1).substrate("o",1.0,0.0,1.0,-1.0); s.cell_type("a").exchange("o",1.0,0.0).exchange("o",0.0,1.0);' "already set"
+expect_error edge_side 'cell.sim(1).substrate("o",1.0,0.0,1.0,-1.0).edge("o","left",1.0);' "edge side"
+expect_error edge_substrate 'cell.sim(1).edge("o","xmin",1.0);' "unknown edge substrate"
+expect_error chemotaxis_bias 'cell.sim(1).cell_type("a").chemotaxis("o",1.5);' "bias"
+expect_error chemotaxis_substrate 'let s=cell.sim(1); s.cell_type("a").motility(1.0,1.0).chemotaxis("o",0.5); s.run(1.0,0.1);' "chemotaxis substrate"
+expect_error scatter_outside 'let s=cell.sim(1); s.cell_type("a"); s.scatter("a",5,0.0,500.0,0.0,10.0);' "inside the domain"
+expect_error record_zero 'cell.sim(1).record(0.0);' "record interval"
+expect_error live_of 'cell.sim(1).run(0.0,1.0).live_of("ghost");' "unknown cell type"
+expect_error reserved 'cell.sim(1).substrate("neighbors",1.0,0.0,1.0,-1.0).run(1.0,0.1);' "reserved"
+ok "errors stop with exit 3 and clear messages (24 cases)"
 
 # Dry run loads/verifies bytecode without executing numerical work or writing CSV.
 rm -f build/examples/tissue_decay_profiles.csv

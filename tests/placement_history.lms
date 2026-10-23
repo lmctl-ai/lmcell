@@ -1,0 +1,20 @@
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(9).domain(0.0,200.0,0.0,100.0,10.0);
+s.substrate("food",0.0,0.0,1.0,-1.0).substrate("signal",0.0,0.0,0.0,-1.0);
+s.substrate("cue",20.0,0.0,0.0,-1.0).edge("cue","xmin",0.0).edge("cue","xmax",1.0);
+s.cell_type("eater").radius(1.0).exchange("food",1.0,0.0).exchange("signal",0.0,1.0);
+s.cell_type("mover").radius(1.0).motility(1.0,0.01).chemotaxis("cue",1.0);
+s.cell_type("sleeper").radius(1.0).rule_toward("food","cycle entry",0.0,0.5,1.0);
+s.scatter("eater",50,0.0,100.0,0.0,100.0).seed_disk("mover",30,150.0,50.0,5.0).seed("sleeper",5,100.0,50.0);
+let r=s.record(1.0).run(4.0,0.05);
+cell.assert_true(r.cells().rows()==85);
+cell.assert_true(r.live_of("eater")==50 && r.live_of("mover")==30 && r.live_of("sleeper")==5);
+cell.assert_true(r.type_counts().cols()==4 && r.type_counts().rows()==r.counts().rows());
+cell.assert_true(r.history().rows()==5*85 && r.history().cols()==5);
+cell.assert_true(r.profile_history().rows()==5*200 && r.profile_history().cols()==6);
+cell.assert_close(r.history().get(5*85-1,0),4.0,0.0);
+cell.assert_true(r.cells().get(0,0)>=0.0 && r.cells().get(0,0)<100.0);
+cell.assert_true(r.cells().get(50,0)>=144.0 && r.cells().get(50,0)<=156.0);
+cell.assert_true(r.cells().get(84,0)==100.0);
+end _dsl_
+savedsl(p, "build/placement_history.dslb");

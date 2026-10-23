@@ -1,3 +1,4 @@
+#define _USE_MATH_DEFINES
 #include "PhysiCell.h"
 #include "core.hpp"
 #include <cmath>
@@ -84,9 +85,7 @@ int main(int argc, char **argv) {
       c.dt = .01;
       c.substrates.push_back({"signal", 0, 0, 0, -1});
       t.radius = 2;
-      t.substrate = "signal";
-      t.secretion_rate = 3;
-      t.uptake_rate = 1;
+      t.exchanges.push_back({"signal", 1, 3});
       c.types.push_back(t);
       c.seeds.push_back({5, 5, 0});
       c.duration = 20;
@@ -211,6 +210,182 @@ int main(int argc, char **argv) {
       }
       near(r.profiles.at(10, 2), std::exp(-1.0), .0015,
            "semi-infinite exponential penetration");
+    } else if (mode == "edges") {
+      // True 2D fixed-boundary diffusion. Square plate, one hot side at 1,
+      // three cold sides at 0, no decay: by superposition of the four
+      // rotated problems the steady centre value is exactly 1/4.
+      c.xmin = 0;
+      c.xmax = 105;
+      c.ymin = 0;
+      c.ymax = 105;
+      c.voxel_size = 5;
+      // BioFVM re-pins edge voxels between LOD sweeps; the steady error
+      // scales with D*dt/h^2, so keep that ratio at 0.01.
+      c.duration = 1500;
+      c.dt = .025;
+      c.substrates.push_back({"heat", 10, 0, 0, -1});
+      c.edges.push_back({"heat", "xmin", 1});
+      c.edges.push_back({"heat", "xmax", 0});
+      c.edges.push_back({"heat", "ymin", 0});
+      c.edges.push_back({"heat", "ymax", 0});
+      auto r = run(c);
+      check(r.profiles.rows == 441, "21x21 voxels");
+      // Voxel (10,10) is the centre; x-fastest ordering.
+      near(r.profiles.at(10 + 21 * 10, 0), 52.5, 0, "centre voxel x");
+      near(r.profiles.at(10 + 21 * 10, 2), .25, .004, "2D Laplace centre 1/4");
+      // Mirror symmetry about y = centre.
+      for (int i = 0; i < 21; ++i)
+        for (int j = 0; j < 21; ++j)
+          near(r.profiles.at(i + 21 * j, 2), r.profiles.at(i + 21 * (20 - j), 2),
+               1e-9, "mirror symmetry in y");
+      // Series solution at quarter points on the centre line (continuous
+      // square of side 100 between the pinned voxel centres).
+      for (int i : {5, 15}) {
+        double x = (i * 5.0) / 100.0, y = .5, sum = 0;
+        for (int n = 1; n < 200; n += 2)
+          sum += 4 / (n * M_PI) * std::sin(n * M_PI * y) *
+                 std::sinh(n * M_PI * (1 - x)) / std::sinh(n * M_PI);
+        near(r.profiles.at(i + 21 * 10, 2), sum, .01, "2D Laplace series");
+      }
+      std::cout << "edges centre=" << r.profiles.at(220, 2) << '\n';
+    } else if (mode == "gradient") {
+      // A linear steady gradient between a fixed xmin and xmax edge.
+      c.xmin = 0;
+      c.xmax = 200;
+      c.ymin = 0;
+      c.ymax = 40;
+      c.voxel_size = 10;
+      c.duration = 3000;
+      if (argc > 2) { // gradient substep: coarse cell step, fine diffusion
+        c.dt = 1;
+        c.diffusion_dt = .05;
+      } else
+        c.dt = .05; // D*dt/h^2 = 0.01 (see edges)
+      c.substrates.push_back({"cue", 20, 0, 0, -1});
+      c.edges.push_back({"cue", "xmin", 0});
+      c.edges.push_back({"cue", "xmax", 1});
+      auto r = run(c);
+      for (size_t i = 0; i < r.profiles.rows; ++i)
+        near(r.profiles.at(i, 2), (r.profiles.at(i, 0) - 5) / 190, 2e-3,
+             "linear steady profile between fixed edges");
+    } else if (mode == "chemotaxis") {
+      // Direction re-drawn every step (persistence < dt): mean velocity up
+      // the gradient is speed*E[(b+(1-b)cos)/|b e+(1-b)u|]; 1 for b=1 and
+      // 2/pi for b=1/2. A history snapshot after the gradient forms gives the
+      // drift over a known window.
+      c.xmin = 0;
+      c.xmax = 1000;
+      c.ymin = 0;
+      c.ymax = 1000;
+      c.voxel_size = 20;
+      c.duration = 200;
+      c.dt = .1;
+      c.record_interval = 50;
+      c.substrates.push_back({"cue", 10000, 0, 0, -1});
+      c.edges.push_back({"cue", "xmin", 0});
+      c.edges.push_back({"cue", "xmax", 1});
+      CellType full = t, half = t;
+      full.name = "full";
+      half.name = "half";
+      for (auto *q : {&full, &half}) {
+        q->motility_speed = 1;
+        q->persistence_time = .01;
+        q->chemotaxis = "cue";
+      }
+      full.chemotaxis_bias = 1;
+      half.chemotaxis_bias = .5;
+      c.types = {full, half};
+      constexpr int n = 2000;
+      for (int i = 0; i < n; ++i) {
+        c.seeds.push_back({500, 500, 0});
+        c.seeds.push_back({500, 500, 1});
+      }
+      auto r = run(c);
+      check(r.history.rows == 5 * 2 * n, "five snapshots of every cell");
+      double x1[2] = {0, 0}, x4[2] = {0, 0}, y4[2] = {0, 0};
+      for (size_t i = 0; i < r.history.rows; ++i) {
+        const int ty = static_cast<int>(r.history.at(i, 3));
+        if (r.history.at(i, 0) == 50)
+          x1[ty] += r.history.at(i, 1) / n;
+        if (r.history.at(i, 0) == 200) {
+          x4[ty] += r.history.at(i, 1) / n;
+          y4[ty] += r.history.at(i, 2) / n;
+        }
+      }
+      near(x4[0] - x1[0], 150, .5, "full bias: straight up the gradient");
+      near(x4[1] - x1[1], 150 * 2 / M_PI, 1.5, "half bias drift 2/pi");
+      near(y4[1], 500, 1.5, "no drift across the gradient");
+      check(r.type_counts.cols == 3 && r.type_counts.at(0, 1) == n &&
+                r.type_counts.at(0, 2) == n,
+            "per-type counts");
+      std::cout << "chemotaxis drift full=" << x4[0] - x1[0]
+                << " half=" << x4[1] - x1[1] << '\n';
+    } else if (mode == "toward") {
+      // PhysiCell-style saturation: zero base cycle rate, signal at
+      // half-max, saturation 0.3 -> rate 0.15 (an increasing rule could not
+      // lift a zero base).
+      constexpr int n = 10000;
+      c.substrates.push_back({"growth_factor", 0, 0, 1, -1});
+      Rule rule{"growth_factor", "toward", "cycle entry", 1, 2, 0};
+      rule.saturation = .3;
+      c.rules.push_back(rule);
+      c.types.push_back(t);
+      for (int i = 0; i < n; ++i)
+        c.seeds.push_back({0, 0, 0});
+      auto r = run(c);
+      const double factor = std::exp(.15 * 2);
+      near(r.counts.at(r.counts.rows - 1, 1), n * factor,
+           3 * std::sqrt(n * factor * (factor - 1)) + n * .005,
+           "rule toward saturation from a zero base");
+    } else if (mode == "crowding") {
+      // Contact inhibition in one voxel: cycle 0.1*(1-H(N-1)), death 0.02.
+      // Births balance deaths at H=0.8, i.e. N-1 = K*4^(1/n) = 100.
+      c.xmin = 0;
+      c.xmax = 20;
+      c.ymin = 0;
+      c.ymax = 20;
+      c.voxel_size = 20;
+      c.duration = 1500;
+      c.dt = .5;
+      t.cycle_rate = .1;
+      t.death_rate = .02;
+      Rule rule{kNeighbors, "toward", "cycle entry", 50, 2, 0};
+      rule.saturation = 0;
+      c.rules.push_back(rule);
+      c.types.push_back(t);
+      for (int i = 0; i < 10; ++i)
+        c.seeds.push_back({10, 10, 0});
+      auto r = run(c);
+      double mean = 0;
+      int m = 0;
+      for (size_t i = 0; i < r.counts.rows; ++i)
+        if (r.counts.at(i, 0) >= 500) {
+          mean += r.counts.at(i, 1);
+          ++m;
+        }
+      mean /= m;
+      near(mean, 101, 6, "contact inhibition carrying capacity");
+      std::cout << "crowding mean=" << mean << " expected=101\n";
+    } else if (mode == "multiexchange") {
+      // One type consumes food and secretes a signal at once.
+      c.xmin = 0;
+      c.xmax = 10;
+      c.ymin = 0;
+      c.ymax = 10;
+      c.voxel_size = 10;
+      c.duration = 1;
+      c.dt = .01;
+      c.substrates.push_back({"food", 0, 0, 1, -1});
+      c.substrates.push_back({"signal", 0, 0, 0, -1});
+      t.exchanges.push_back({"food", 2, 0});
+      t.exchanges.push_back({"signal", 0, 3});
+      c.types.push_back(t);
+      c.seeds.push_back({5, 5, 0});
+      auto r = run(c);
+      const double cv = 4.0 / 3 * 3.14159265358979323846 / 1000;
+      near(r.profiles.at(0, 2), std::exp(-2 * cv), 1e-6, "uptake of food");
+      near(r.profiles.at(0, 3), 1 - std::exp(-3 * cv), 1e-5,
+           "secretion of signal toward saturation 1");
     } else if (mode == "exchange") {
       PhysiCell::cell_defaults.phenotype.secretion.pMicroenvironment = nullptr;
       c.xmin = 0;
@@ -221,8 +396,7 @@ int main(int argc, char **argv) {
       c.duration = 1;
       c.dt = .01;
       c.substrates.push_back({"food", 0, 0, 1, -1});
-      t.substrate = "food";
-      t.uptake_rate = 2;
+      t.exchanges.push_back({"food", 2, 0});
       c.types.push_back(t);
       c.seeds.push_back({5, 5, 0});
       auto r = run(c);
@@ -263,6 +437,33 @@ int main(int argc, char **argv) {
       b = c;
       b.rules.push_back({"unknown", "bad", "cycle entry", 1, 2});
       bad(b);
+      b = c;
+      b.substrates.push_back({"o", 1, 0, 1, -1});
+      b.types.push_back(t);
+      b.types[0].exchanges = {{"o", 1, 0}, {"o", 0, 1}};
+      bad(b); // a second exchange for the same substrate
+      b.types[0].exchanges.clear();
+      b.types[0].chemotaxis = "o";
+      b.types[0].chemotaxis_bias = 1.5;
+      bad(b);
+      b = c;
+      b.substrates.push_back({kNeighbors, 1, 0, 1, -1});
+      bad(b);
+      b = c;
+      b.substrates.push_back({"o", 1, 0, 1, -1});
+      b.edges.push_back({"o", "left", 1});
+      bad(b);
+      b.edges = {{"o", "xmin", -2}};
+      bad(b);
+      b = c;
+      b.ymax = b.ymin + b.voxel_size;
+      b.substrates.push_back({"o", 1, 0, 1, -1});
+      b.edges.push_back({"o", "ymin", 1});
+      bad(b);
+      b = c;
+      b.record_interval = -1;
+      bad(b);
+
     } else if (mode == "partial") {
       c.duration = .25;
       c.dt = .1;

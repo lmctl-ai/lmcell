@@ -93,6 +93,57 @@
             "returns": "Sim"
           }
         ],
+        "scatter": [
+          {
+            "params": [
+              "string",
+              "int",
+              "float",
+              "float",
+              "float",
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "seed_disk": [
+          {
+            "params": [
+              "string",
+              "int",
+              "float",
+              "float",
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "edge": [
+          {
+            "params": [
+              "string",
+              "string",
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "diffusion_dt": [
+          {
+            "params": [
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
+        "record": [
+          {
+            "params": [
+              "float"
+            ],
+            "returns": "Sim"
+          }
+        ],
         "run": [
           {
             "params": [
@@ -149,6 +200,27 @@
             "returns": "CellType"
           }
         ],
+        "chemotaxis": [
+          {
+            "params": [
+              "string",
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ],
+        "rule_toward": [
+          {
+            "params": [
+              "string",
+              "string",
+              "float",
+              "float",
+              "float"
+            ],
+            "returns": "CellType"
+          }
+        ],
         "rule": [
           {
             "params": [
@@ -181,6 +253,32 @@
           {
             "params": [],
             "returns": "Matrix"
+          }
+        ],
+        "type_counts": [
+          {
+            "params": [],
+            "returns": "Matrix"
+          }
+        ],
+        "history": [
+          {
+            "params": [],
+            "returns": "Matrix"
+          }
+        ],
+        "profile_history": [
+          {
+            "params": [],
+            "returns": "Matrix"
+          }
+        ],
+        "live_of": [
+          {
+            "params": [
+              "string"
+            ],
+            "returns": "int"
           }
         ],
         "live": [

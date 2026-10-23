@@ -5,6 +5,7 @@
 #include "notices_embedded.hpp"
 #include "schema_embedded.hpp"
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
@@ -25,6 +26,15 @@ struct Cell {};
 struct Sim {
   lmcell::Config config;
   bool ran = false;
+  std::uint64_t rng = 0; // placement stream for scatter/seed_disk
+  // splitmix64: identical placements on every platform for the same seed.
+  double uniform() {
+    std::uint64_t z = (rng += 0x9E3779B97F4A7C15ULL);
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    z ^= z >> 31;
+    return static_cast<double>(z >> 11) * (1.0 / 9007199254740992.0);
+  }
 };
 struct Type {
   Sim *sim;
@@ -101,6 +111,28 @@ int integer(const Value &v, int lo, int hi, const char *what) {
     throw dslvm::Error(std::string(what) + " outside allowed range");
   return static_cast<int>(v.i);
 }
+size_t type_index(Sim &s, const std::string &name) {
+  size_t i = 0;
+  while (i < s.config.types.size() && s.config.types[i].name != name)
+    ++i;
+  if (i == s.config.types.size())
+    throw dslvm::Error("unknown cell type: " + name);
+  return i;
+}
+// Validates a placement request and returns the cell count.
+int placement_count(Sim &s, const Value &count) {
+  editable(s);
+  int n = integer(count, 0, 100000, "cell count");
+  if (s.config.seeds.size() + static_cast<size_t>(n) > 100000)
+    throw dslvm::Error("cell count limit exceeded");
+  return n;
+}
+void inside(Sim &s, double x, double y) {
+  const auto &c = s.config;
+  if (!(x >= c.xmin && x < c.xmax && y >= c.ymin && y < c.ymax))
+    throw dslvm::Error("placement region must lie inside the domain; set "
+                       "domain(...) first");
+}
 void register_host(dslvm::Registry &r, Host &h) {
   r.context("cell", "Cell");
   check(r, "Cell", "sim", {"int"}, "Sim", [&h](void *p, Args &a) {
@@ -111,6 +143,7 @@ void register_host(dslvm::Registry &r, Host &h) {
       throw dslvm::Error("seed must be in [0,4294967295]");
     Sim s;
     s.config.seed = static_cast<unsigned>(a[0].i);
+    s.rng = 0x6C6D63656C6CULL ^ (static_cast<std::uint64_t>(a[0].i) << 16);
     return h.hold(h.sims, "Sim", std::move(s));
   });
   check(r, "Sim", "domain", {"float", "float", "float", "float", "float"},
@@ -167,21 +200,104 @@ void register_host(dslvm::Registry &r, Host &h) {
           (void)p;
           (void)a;
           auto &s = sim(p);
-          editable(s);
-          int n = integer(a[1], 0, 100000, "cell count");
-          if (s.config.seeds.size() + static_cast<size_t>(n) > 100000)
-            throw dslvm::Error("cell count limit exceeded");
-          size_t i = 0;
-          while (i < s.config.types.size() && s.config.types[i].name != a[0].s)
-            ++i;
-          if (i == s.config.types.size())
-            throw dslvm::Error("unknown cell type: " + a[0].s);
+          int n = placement_count(s, a[1]);
+          size_t i = type_index(s, a[0].s);
           finite(a[2].f, "seed x");
           finite(a[3].f, "seed y");
           for (int j = 0; j < n; ++j)
             s.config.seeds.push_back({a[2].f, a[3].f, static_cast<double>(i)});
           return Value::object("Sim", p);
         });
+  check(r, "Sim", "scatter",
+        {"string", "int", "float", "float", "float", "float"}, "Sim",
+        [&h](void *p, Args &a) {
+          (void)h;
+          auto &s = sim(p);
+          int n = placement_count(s, a[1]);
+          size_t i = type_index(s, a[0].s);
+          for (int k = 2; k < 6; ++k)
+            finite(a[k].f, "scatter bounds");
+          if (!(a[3].f > a[2].f) || !(a[5].f > a[4].f))
+            throw dslvm::Error("scatter bounds must satisfy xmin<xmax, "
+                               "ymin<ymax");
+          inside(s, a[2].f, a[4].f);
+          inside(s, std::nextafter(a[3].f, a[2].f),
+                 std::nextafter(a[5].f, a[4].f));
+          for (int j = 0; j < n; ++j) {
+            double x = a[2].f + (a[3].f - a[2].f) * s.uniform();
+            double y = a[4].f + (a[5].f - a[4].f) * s.uniform();
+            s.config.seeds.push_back({x, y, static_cast<double>(i)});
+          }
+          return Value::object("Sim", p);
+        });
+  check(r, "Sim", "seed_disk", {"string", "int", "float", "float", "float"},
+        "Sim", [&h](void *p, Args &a) {
+          (void)h;
+          auto &s = sim(p);
+          int n = placement_count(s, a[1]);
+          size_t i = type_index(s, a[0].s);
+          finite(a[2].f, "disk x");
+          finite(a[3].f, "disk y");
+          finite(a[4].f, "disk radius");
+          if (a[4].f < 0)
+            throw dslvm::Error("disk radius must be nonnegative");
+          inside(s, a[2].f - a[4].f, a[3].f - a[4].f);
+          if (!(a[2].f + a[4].f < s.config.xmax &&
+                a[3].f + a[4].f < s.config.ymax))
+            throw dslvm::Error("placement region must lie inside the domain; "
+                               "set domain(...) first");
+          for (int j = 0; j < n; ++j) {
+            const double rr = a[4].f * std::sqrt(s.uniform());
+            const double th = 6.283185307179586 * s.uniform();
+            s.config.seeds.push_back({a[2].f + rr * std::cos(th),
+                                      a[3].f + rr * std::sin(th),
+                                      static_cast<double>(i)});
+          }
+          return Value::object("Sim", p);
+        });
+  check(r, "Sim", "edge", {"string", "string", "float"}, "Sim",
+        [&h](void *p, Args &a) {
+          (void)h;
+          auto &s = sim(p);
+          editable(s);
+          if (s.config.edges.size() >= 128)
+            throw dslvm::Error("edge limit exceeded");
+          bool known = false;
+          for (auto &v : s.config.substrates)
+            known = known || v.name == a[0].s;
+          if (!known)
+            throw dslvm::Error("unknown edge substrate: " + a[0].s +
+                               " (declare it with substrate(...) first)");
+          if (a[1].s != "xmin" && a[1].s != "xmax" && a[1].s != "ymin" &&
+              a[1].s != "ymax")
+            throw dslvm::Error("edge side must be xmin, xmax, ymin or ymax");
+          finite(a[2].f, "edge value");
+          if (a[2].f < 0 && a[2].f != -1)
+            throw dslvm::Error(
+                "edge value must be nonnegative or -1 for no flux");
+          s.config.edges.push_back({a[0].s, a[1].s, a[2].f});
+          return Value::object("Sim", p);
+        });
+  check(r, "Sim", "diffusion_dt", {"float"}, "Sim", [&h](void *p, Args &a) {
+    (void)h;
+    auto &s = sim(p);
+    editable(s);
+    finite(a[0].f, "diffusion dt");
+    if (a[0].f <= 0)
+      throw dslvm::Error("diffusion dt must be positive");
+    s.config.diffusion_dt = a[0].f;
+    return Value::object("Sim", p);
+  });
+  check(r, "Sim", "record", {"float"}, "Sim", [&h](void *p, Args &a) {
+    (void)h;
+    auto &s = sim(p);
+    editable(s);
+    finite(a[0].f, "record interval");
+    if (a[0].f <= 0)
+      throw dslvm::Error("record interval must be positive");
+    s.config.record_interval = a[0].f;
+    return Value::object("Sim", p);
+  });
   check(r, "Sim", "run", {"float", "float"}, "Result", [&h](void *p, Args &a) {
     (void)h;
     (void)p;
@@ -248,9 +364,43 @@ void register_host(dslvm::Registry &r, Host &h) {
           editable(*t.sim);
           rate(a[1].f, "uptake");
           rate(a[2].f, "secretion");
-          t.data().substrate = a[0].s;
-          t.data().uptake_rate = a[1].f;
-          t.data().secretion_rate = a[2].f;
+          for (const auto &e : t.data().exchanges)
+            if (e.substrate == a[0].s)
+              throw dslvm::Error("exchange for substrate '" + a[0].s +
+                                 "' is already set on cell type '" +
+                                 t.data().name + "'");
+          if (t.data().exchanges.size() >= 32)
+            throw dslvm::Error("exchange limit exceeded");
+          t.data().exchanges.push_back({a[0].s, a[1].f, a[2].f});
+          return Value::object("CellType", p);
+        });
+  check(r, "CellType", "chemotaxis", {"string", "float"}, "CellType",
+        [&h](void *p, Args &a) {
+          (void)h;
+          auto &t = type(p);
+          editable(*t.sim);
+          finite(a[1].f, "chemotaxis bias");
+          if (a[1].f < 0 || a[1].f > 1)
+            throw dslvm::Error("chemotaxis bias must be in [0,1]");
+          if (a[0].s.empty())
+            throw dslvm::Error("chemotaxis substrate is empty");
+          t.data().chemotaxis = a[0].s;
+          t.data().chemotaxis_bias = a[1].f;
+          return Value::object("CellType", p);
+        });
+  check(r, "CellType", "rule_toward",
+        {"string", "string", "float", "float", "float"}, "CellType",
+        [&h](void *p, Args &a) {
+          (void)h;
+          auto &t = type(p);
+          editable(*t.sim);
+          if (t.sim->config.rules.size() >= 1000)
+            throw dslvm::Error("rule limit exceeded");
+          rate(a[2].f, "rule saturation");
+          lmcell::Rule r{a[0].s, "toward", a[1].s, a[3].f, a[4].f};
+          r.type = t.index;
+          r.saturation = a[2].f;
+          t.sim->config.rules.push_back(r);
           return Value::object("CellType", p);
         });
   check(r, "CellType", "rule", {"string", "string", "string", "float", "float"},
@@ -284,6 +434,28 @@ void register_host(dslvm::Registry &r, Host &h) {
     (void)p;
     (void)a;
     return h.hold(h.matrices, "Matrix", result(p).profiles);
+  });
+  check(r, "Result", "type_counts", {}, "Matrix", [&h](void *p, Args &a) {
+    (void)a;
+    return h.hold(h.matrices, "Matrix", result(p).type_counts);
+  });
+  check(r, "Result", "history", {}, "Matrix", [&h](void *p, Args &a) {
+    (void)a;
+    return h.hold(h.matrices, "Matrix", result(p).history);
+  });
+  check(r, "Result", "profile_history", {}, "Matrix", [&h](void *p, Args &a) {
+    (void)a;
+    return h.hold(h.matrices, "Matrix", result(p).profile_history);
+  });
+  check(r, "Result", "live_of", {"string"}, "int", [&h](void *p, Args &a) {
+    (void)h;
+    auto &res = result(p);
+    for (size_t i = 0; i < res.type_names.size(); ++i)
+      if (res.type_names[i] == a[0].s) {
+        auto &m = res.type_counts;
+        return Value::integer(static_cast<int64_t>(m.at(m.rows - 1, i + 1)));
+      }
+    throw dslvm::Error("unknown cell type: " + a[0].s);
   });
   check(r, "Result", "live", {}, "int", [&h](void *p, Args &a) {
     (void)h;

@@ -65,8 +65,17 @@ Results run(const Config &cfg) {
   const double nx = std::ceil((cfg.xmax - cfg.xmin) / cfg.voxel_size),
                ny = std::ceil((cfg.ymax - cfg.ymin) / cfg.voxel_size);
   const double steps_d = std::ceil(cfg.duration / cfg.dt);
+  finite(cfg.diffusion_dt, "diffusion dt");
+  if (cfg.diffusion_dt < 0)
+    throw std::invalid_argument("diffusion dt must be positive");
+  const double sub_d =
+      cfg.diffusion_dt > 0 && steps_d > 0
+          ? std::max(1.0, std::ceil(cfg.duration / steps_d / cfg.diffusion_dt -
+                                    1e-9))
+          : 1.0;
   if (!std::isfinite(nx * ny) || nx * ny > 1000000 || steps_d > 1000000 ||
-      nx * ny * std::max(1.0, steps_d) > 200000000)
+      sub_d > 100000 ||
+      nx * ny * std::max(1.0, steps_d) * sub_d > 200000000)
     throw std::invalid_argument("domain/time resource limit exceeded");
   if (cfg.types.size() > 32 || cfg.substrates.size() > 32 ||
       cfg.seeds.size() > 100000 || cfg.rules.size() > 1000)
@@ -77,6 +86,9 @@ Results run(const Config &cfg) {
     if (s.name.empty() || !names.insert(s.name).second)
       throw std::invalid_argument(
           "substrate names must be unique and nonempty");
+    if (s.name == kNeighbors)
+      throw std::invalid_argument(
+          "substrate name 'neighbors' is reserved for the crowding signal");
     nonnegative(s.diffusion, "diffusion");
     nonnegative(s.decay, "decay");
     nonnegative(s.initial, "initial concentration");
@@ -98,18 +110,34 @@ Results run(const Config &cfg) {
     if (t.persistence_time <= 0 || t.radius <= 0 ||
         !std::isfinite(t.radius * t.radius * t.radius))
       throw std::invalid_argument("persistence and radius must be positive");
-    nonnegative(t.uptake_rate, "uptake");
-    nonnegative(t.secretion_rate, "secretion");
-    if (!t.substrate.empty() && !names.count(t.substrate))
-      throw std::invalid_argument("unknown exchange substrate");
+    std::set<std::string> exchanged;
+    for (const auto &e : t.exchanges) {
+      nonnegative(e.uptake, "uptake");
+      nonnegative(e.secretion, "secretion");
+      if (!names.count(e.substrate))
+        throw std::invalid_argument("unknown exchange substrate");
+      if (!exchanged.insert(e.substrate).second)
+        throw std::invalid_argument("exchange for substrate '" + e.substrate +
+                                    "' is set twice on cell type '" + t.name +
+                                    "'");
+    }
+    if (!t.chemotaxis.empty() && !names.count(t.chemotaxis))
+      throw std::invalid_argument("unknown chemotaxis substrate");
+    finite(t.chemotaxis_bias, "chemotaxis bias");
+    if (t.chemotaxis_bias < 0 || t.chemotaxis_bias > 1)
+      throw std::invalid_argument("chemotaxis bias must be in [0,1]");
   }
   for (const auto &r : cfg.rules) {
-    if (!names.count(r.substrate))
-      throw std::invalid_argument("unknown rule substrate");
+    if (!names.count(r.substrate) && r.substrate != kNeighbors)
+      throw std::invalid_argument("unknown rule substrate (signal must be a "
+                                  "declared substrate or 'neighbors')");
     if (r.type >= nt)
       throw std::invalid_argument("rule type index out of range");
-    if (r.effect != "increases" && r.effect != "decreases")
-      throw std::invalid_argument("rule effect must be increases or decreases");
+    if (r.effect != "increases" && r.effect != "decreases" &&
+        r.effect != "toward")
+      throw std::invalid_argument(
+          "rule effect must be increases, decreases or toward");
+    nonnegative(r.saturation, "rule saturation");
     if (r.target != "cycle entry" && r.target != "cycle rate" &&
         r.target != "apoptosis" && r.target != "death rate" &&
         r.target != "migration speed")
@@ -130,6 +158,27 @@ Results run(const Config &cfg) {
         p[1] >= cfg.ymax)
       throw std::invalid_argument("seed outside domain");
   }
+  for (const auto &e : cfg.edges) {
+    if (!names.count(e.substrate))
+      throw std::invalid_argument("unknown edge substrate");
+    if (e.side != "xmin" && e.side != "xmax" && e.side != "ymin" &&
+        e.side != "ymax")
+      throw std::invalid_argument("edge side must be xmin, xmax, ymin or ymax");
+    if (ny <= 1 && (e.side == "ymin" || e.side == "ymax"))
+      throw std::invalid_argument("a single-row domain has no y edges");
+    finite(e.value, "edge value");
+    if (e.value < 0 && e.value != -1)
+      throw std::invalid_argument(
+          "edge value must be nonnegative or -1 for no flux");
+  }
+  finite(cfg.record_interval, "record interval");
+  if (cfg.record_interval < 0)
+    throw std::invalid_argument("record interval must be nonnegative");
+  const double records =
+      cfg.record_interval > 0 ? std::floor(cfg.duration / cfg.record_interval) + 1
+                              : 0;
+  if (records * nx * ny * (2.0 + cfg.substrates.size()) > 20000000)
+    throw std::invalid_argument("profile history resource limit exceeded");
   if (used)
     throw std::runtime_error(
         "lmcell supports one PhysiCell simulation per process");
@@ -164,15 +213,25 @@ Results run(const Config &cfg) {
       diffusion_decay_solver__constant_coefficients_LOD_2D;
   for (unsigned v = 0; v < microenvironment.number_of_voxels(); ++v) {
     const auto ijk = microenvironment.mesh.cartesian_indices(v);
+    const bool on[4] = {ijk[0] == 0, ijk[0] + 1 == static_cast<unsigned>(nx),
+                        ny > 1 && ijk[1] == 0,
+                        ny > 1 && ijk[1] + 1 == static_cast<unsigned>(ny)};
     for (size_t i = 0; i < cfg.substrates.size(); ++i) {
       const auto &s = cfg.substrates[i];
       microenvironment.density_vector(v)[i] = s.initial;
-      if (s.boundary >= 0 &&
-          (ijk[0] == 0 || ijk[0] + 1 == static_cast<unsigned>(nx) ||
-           (ny > 1 &&
-            (ijk[1] == 0 || ijk[1] + 1 == static_cast<unsigned>(ny)))))
-        microenvironment.update_dirichlet_node(v, static_cast<int>(i),
-                                               s.boundary);
+      // Global edge value first, then per-side overrides in call order.
+      double pin = (on[0] || on[1] || on[2] || on[3]) ? s.boundary : -1;
+      for (const auto &e : cfg.edges)
+        if (e.substrate == s.name) {
+          const int side = e.side == "xmin"   ? 0
+                           : e.side == "xmax" ? 1
+                           : e.side == "ymin" ? 2
+                                              : 3;
+          if (on[side])
+            pin = e.value;
+        }
+      if (pin >= 0)
+        microenvironment.update_dirichlet_node(v, static_cast<int>(i), pin);
     }
   }
   microenvironment.apply_dirichlet_conditions();
@@ -211,10 +270,10 @@ Results run(const Config &cfg) {
     ph.motility.persistence_time = t.persistence_time;
     ph.secretion.set_all_secretion_to_zero();
     ph.secretion.set_all_uptake_to_zero();
-    if (!t.substrate.empty()) {
-      int si = microenvironment.find_density_index(t.substrate);
-      ph.secretion.uptake_rates[si] = t.uptake_rate;
-      ph.secretion.secretion_rates[si] = t.secretion_rate;
+    for (const auto &e : t.exchanges) {
+      int si = microenvironment.find_density_index(e.substrate);
+      ph.secretion.uptake_rates[si] = e.uptake;
+      ph.secretion.secretion_rates[si] = e.secretion;
       ph.secretion.saturation_densities[si] = 1;
     }
   }
@@ -263,16 +322,84 @@ Results run(const Config &cfg) {
   }
   Results out;
   out.counts.cols = 2;
+  out.type_counts.cols = 1 + nt;
+  for (size_t i = 0; i < nt; ++i)
+    out.type_names.push_back(cfg.types.empty() ? "cell" : cfg.types[i].name);
   auto sample = [&](double t) {
     size_t alive = 0;
+    std::vector<double> per(nt, 0.0);
     for (auto *c : *all_cells)
-      if (!c->phenotype.death.dead)
+      if (!c->phenotype.death.dead) {
         ++alive;
+        per[static_cast<size_t>(c->type)] += 1;
+      }
     out.counts.values.insert(out.counts.values.end(),
                              {t, static_cast<double>(alive)});
     ++out.counts.rows;
+    out.type_counts.values.push_back(t);
+    out.type_counts.values.insert(out.type_counts.values.end(), per.begin(),
+                                  per.end());
+    ++out.type_counts.rows;
+  };
+  out.history.cols = 5;
+  out.profile_history.cols = 3 + cfg.substrates.size();
+  auto record = [&](double t) {
+    for (auto *c : *all_cells) {
+      if (out.history.values.size() > 20000000)
+        throw std::runtime_error("history resource limit exceeded; record "
+                                 "less often or seed fewer cells");
+      out.history.values.insert(out.history.values.end(),
+                                {t, c->position[0], c->position[1],
+                                 static_cast<double>(c->type),
+                                 c->phenotype.death.dead ? 0.0 : 1.0});
+      ++out.history.rows;
+    }
+    for (unsigned v = 0; v < microenvironment.number_of_voxels(); ++v) {
+      const auto &p = microenvironment.mesh.voxels[v].center;
+      out.profile_history.values.insert(out.profile_history.values.end(),
+                                        {t, p[0], p[1]});
+      for (size_t i = 0; i < cfg.substrates.size(); ++i)
+        out.profile_history.values.push_back(
+            microenvironment.density_vector(v)[i]);
+      ++out.profile_history.rows;
+    }
+  };
+  size_t next_record = 0;
+  auto maybe_record = [&](double t) {
+    if (cfg.record_interval <= 0)
+      return;
+    const double target = next_record * cfg.record_interval;
+    if (t + 1e-9 * cfg.record_interval >= target) {
+      record(t);
+      next_record = static_cast<size_t>(
+                        std::floor(t / cfg.record_interval + 1e-9)) +
+                    1;
+    }
+  };
+  // Crowding signal and chemotactic gradients use the state at step start.
+  const unsigned nvx =
+      static_cast<unsigned>(microenvironment.mesh.x_coordinates.size());
+  const unsigned nvy =
+      static_cast<unsigned>(microenvironment.mesh.y_coordinates.size());
+  std::vector<double> crowd(microenvironment.number_of_voxels(), 0.0);
+  auto gradient = [&](int v, int si, double g[2]) {
+    const auto ijk = microenvironment.mesh.cartesian_indices(v);
+    const unsigned i = ijk[0], j = ijk[1];
+    auto rho = [&](unsigned a, unsigned b) {
+      return microenvironment.density_vector(static_cast<int>(a + b * nvx))[si];
+    };
+    const double h = cfg.voxel_size;
+    g[0] = nvx < 2         ? 0
+           : i == 0        ? (rho(1, j) - rho(0, j)) / h
+           : i + 1 == nvx  ? (rho(i, j) - rho(i - 1, j)) / h
+                           : (rho(i + 1, j) - rho(i - 1, j)) / (2 * h);
+    g[1] = nvy < 2         ? 0
+           : j == 0        ? (rho(i, 1) - rho(i, 0)) / h
+           : j + 1 == nvy  ? (rho(i, j) - rho(i, j - 1)) / h
+                           : (rho(i, j + 1) - rho(i, j - 1)) / (2 * h);
   };
   sample(0);
+  maybe_record(0);
   double time = 0;
   const auto steps = static_cast<size_t>(steps_d);
   const double fixed_dt =
@@ -281,6 +408,11 @@ Results run(const Config &cfg) {
     const double dt = fixed_dt;
     auto snapshot = *all_cells;
     std::vector<Cell *> remove;
+    std::fill(crowd.begin(), crowd.end(), 0.0);
+    for (auto *c : snapshot)
+      if (!c->phenotype.death.dead)
+        crowd[static_cast<size_t>(
+            microenvironment.nearest_voxel_index(c->position))] += 1;
     for (auto *c : snapshot) {
       auto &ph = c->phenotype;
       const size_t ti = static_cast<size_t>(c->type);
@@ -289,17 +421,25 @@ Results run(const Config &cfg) {
              speed = t.motility_speed;
       for (const auto &r : cfg.rules)
         if (r.type == ti) {
-          double f = response(
-              c->nearest_density_vector()[microenvironment.find_density_index(
-                  r.substrate)],
-              r.half_max, r.hill);
-          double factor = r.effect == "increases" ? 1 + f : 1 - f;
-          if (r.target == "cycle entry" || r.target == "cycle rate")
-            cycle *= factor;
-          else if (r.target == "apoptosis" || r.target == "death rate")
-            death *= factor;
+          double signal;
+          if (r.substrate == kNeighbors) {
+            signal = crowd[static_cast<size_t>(
+                microenvironment.nearest_voxel_index(c->position))];
+            if (!ph.death.dead)
+              signal -= 1; // other cells only
+          } else
+            signal = c->nearest_density_vector()
+                [microenvironment.find_density_index(r.substrate)];
+          double f = response(signal, r.half_max, r.hill);
+          double &v = (r.target == "cycle entry" || r.target == "cycle rate")
+                          ? cycle
+                      : (r.target == "apoptosis" || r.target == "death rate")
+                          ? death
+                          : speed;
+          if (r.effect == "toward")
+            v += (r.saturation - v) * f;
           else
-            speed *= factor;
+            v *= r.effect == "increases" ? 1 + f : 1 - f;
         }
       if (!std::isfinite(cycle + death + speed) ||
           std::max(cycle, death) * dt > 0.1)
@@ -344,6 +484,20 @@ Results run(const Config &cfg) {
         if (old > 0)
           for (auto &v : ph.motility.motility_vector)
             v *= speed / old;
+        if (!t.chemotaxis.empty()) {
+          double g[2];
+          gradient(microenvironment.nearest_voxel_index(c->position),
+                   microenvironment.find_density_index(t.chemotaxis), g);
+          const double n = std::hypot(g[0], g[1]);
+          auto &d = ph.motility.migration_bias_direction;
+          d.assign(3, 0.0);
+          if (n > 0) {
+            d[0] = g[0] / n;
+            d[1] = g[1] / n;
+          }
+          // No gradient: fall back to the unbiased walk.
+          ph.motility.migration_bias = n > 0 ? t.chemotaxis_bias : 0.0;
+        }
         c->update_motility_vector(dt);
         move(c, c->position[0] + dt * ph.motility.motility_vector[0],
              c->position[1] + dt * ph.motility.motility_vector[1]);
@@ -351,14 +505,20 @@ Results run(const Config &cfg) {
     }
     for (auto *c : remove)
       delete_cell(c);
-    for (auto *c : *all_cells) {
-      c->set_internal_uptake_constants(dt);
-      c->phenotype.secretion.advance(c, c->phenotype, dt);
+    // Exchange and diffusion share a substep, as in PhysiCell's diffusion_dt.
+    const size_t sub = static_cast<size_t>(sub_d);
+    const double ddt = dt / static_cast<double>(sub);
+    for (auto *c : *all_cells)
+      c->set_internal_uptake_constants(ddt);
+    for (size_t k = 0; k < sub; ++k) {
+      for (auto *c : *all_cells)
+        c->phenotype.secretion.advance(c, c->phenotype, ddt);
+      microenvironment.simulate_diffusion_decay(ddt);
     }
-    microenvironment.simulate_diffusion_decay(dt);
 
     time = std::min(cfg.duration, (step + 1) * fixed_dt);
     sample(time);
+    maybe_record(time);
   }
   out.cells.cols = 4;
   out.cells.rows = all_cells->size();
