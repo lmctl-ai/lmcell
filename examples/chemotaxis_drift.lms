@@ -1,0 +1,88 @@
+# Chemotaxis: how strongly must a cell steer to climb a gradient?
+# A chemokine diffuses between a zero edge (left) and a fixed source edge (right) and settles
+# into a straight-line gradient. Three populations walk with the same speed (1.5 um/min) and
+# persistence (2 min) but steer with bias b = 0, 0.5 and 1: each new heading is
+# normalize((1-b)*random + b*gradient). Known answer: the mean drift speed is
+# v * E[(b + (1-b)cos t) / |b e + (1-b) u|] = 0, 2v/pi and v respectively.
+# Writes images/chemotaxis_drift.png (and images/chemotaxis_drift.gif when ffmpeg is present).
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(2026).domain(0.0,1000.0,0.0,600.0,20.0);
+s.substrate("chemokine",10000.0,0.0,0.0,-1.0).edge("chemokine","xmin",0.0).edge("chemokine","xmax",1.0);
+s.cell_type("unbiased").radius(5.0).motility(1.5,2.0).chemotaxis("chemokine",0.0);
+s.cell_type("half bias").radius(5.0).motility(1.5,2.0).chemotaxis("chemokine",0.5);
+s.cell_type("full bias").radius(5.0).motility(1.5,2.0).chemotaxis("chemokine",1.0);
+s.seed_disk("unbiased",400,250.0,150.0,25.0).seed_disk("half bias",400,250.0,300.0,25.0).seed_disk("full bias",400,250.0,450.0,25.0);
+let r=s.record(6.0).run(240.0,0.1);
+let h=r.history();
+# Mean x at t=60 (every population has 400 cells and none die, so gnuplot's
+# 'smooth unique' over 3*(x-250) masked by type gives the same per-type mean below).
+# Mean x at t=60 (gradient formed) and at t=240, per population.
+let a0=0.0; let a1=0.0; let a2=0.0; let b0=0.0; let b1=0.0; let b2=0.0;
+for (i in range(0,h.rows())) {
+  let t=h.get(i,0); let k=h.get(i,3); let x=h.get(i,1)/400.0;
+  if (t==60.0) { if (k==0.0) { a0=a0+x; } else if (k==1.0) { a1=a1+x; } else { a2=a2+x; } }
+  if (t==240.0) { if (k==0.0) { b0=b0+x; } else if (k==1.0) { b1=b1+x; } else { b2=b2+x; } }
+}
+cell.assert_close((b0-a0)/180.0,0.0,0.08);
+cell.assert_close((b1-a1)/180.0,cell.eval("1.5*2/pi"),0.06);
+cell.assert_close((b2-a2)/180.0,1.5,0.06);
+h.save_csv("build/examples/chemotaxis_history.csv");
+r.profiles().save_csv("build/examples/chemotaxis_field.csv");
+end _dsl_
+savedsl(p, "build/chemotaxis_drift.dslb");
+r = system ${dsl_cli(p)} --dsl build/chemotaxis_drift.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+
+mkdir("build/visual");
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/chemotaxis_drift.png",900,470);
+plot.cmd("set datafile separator ','");
+plot.cmd("set style line 1 lc rgb '#8a8f98' lw 3");
+plot.cmd("set style line 2 lc rgb '#5864a8' lw 3");
+plot.cmd("set style line 3 lc rgb '#df6b38' lw 3");
+plot.cmd("set multiplot title 'Steering bias sets chemotactic drift: 0, 2v/{/Symbol p} and v' font ',15'");
+plot.cmd("set lmargin at screen 0.07; set rmargin at screen 0.55; set tmargin at screen 0.82; set bmargin at screen 0.16");
+plot.cmd("set title 'Cells after 4 hours (dashed: start)'");
+plot.cmd("set xrange [0:1000]; set yrange [0:600]; set size ratio -1");
+plot.cmd("set xlabel 'x (micrometers)  -> chemokine rises'; set ylabel 'y (micrometers)'");
+plot.cmd("set tics nomirror out; set border 3");
+plot.cmd("set palette defined (0 '#ffffff', 1 '#cfe9e6')");
+plot.cmd("unset colorbox");
+plot.cmd("set object 1 circle at 250,150 size 25 fs empty border lc rgb '#555555' dt 2 front");
+plot.cmd("set object 2 circle at 250,300 size 25 fs empty border lc rgb '#555555' dt 2 front");
+plot.cmd("set object 3 circle at 250,450 size 25 fs empty border lc rgb '#555555' dt 2 front");
+plot.cmd("set key at 990,190 right bottom samplen 1 spacing 1.1 font ',10' box lc rgb '#cccccc' opaque");
+plot.cmd("plot 'build/examples/chemotaxis_field.csv' using 1:2:3 with image notitle, 'build/examples/chemotaxis_history.csv' using ($1==240&&$4==0?$2:NaN):3 with points pt 7 ps 0.25 lc rgb '#8a8f98' title 'bias b = 0', '' using ($1==240&&$4==1?$2:NaN):3 with points pt 7 ps 0.25 lc rgb '#5864a8' title 'b = 0.5', '' using ($1==240&&$4==2?$2:NaN):3 with points pt 7 ps 0.25 lc rgb '#df6b38' title 'b = 1'");
+plot.cmd("unset object 1; unset object 2; unset object 3");
+plot.cmd("set lmargin at screen 0.66; set rmargin at screen 0.98; set tmargin at screen 0.82; set bmargin at screen 0.16");
+plot.cmd("set size noratio; set autoscale; set xrange [0:240]; set yrange [-20:380]");
+plot.cmd("set title 'Mean displacement up the gradient'");
+plot.cmd("set xlabel 'Time (minutes)'; set ylabel 'Mean drift (micrometers)'");
+plot.cmd("set grid back lc rgb '#e4e9ef'");
+plot.cmd("set key at graph 0.99, graph 0.35 right top font ',10' samplen 2 spacing 1.0 nobox");
+plot.cmd("plot 'build/examples/chemotaxis_history.csv' using 1:($4==0?3*($2-250):0) smooth unique with lines ls 1 title 'b = 0', '' using 1:($4==1?3*($2-250):0) smooth unique with lines ls 2 title 'b = 0.5', '' using 1:($4==2?3*($2-250):0) smooth unique with lines ls 3 title 'b = 1', 1.5*2/pi*x with lines lc rgb '#1d2350' lw 1.5 dt 2 notitle, 1.5*x with lines lc rgb '#7a2a08' lw 1.5 dt 2 notitle, 0 with lines lc rgb '#333333' lw 1.5 dt 2 title 'theory'");
+plot.cmd("unset multiplot");
+plot.close();
+for (k in range(0,41)) {
+  plot.png("build/visual/chemotaxis_drift-frame-"+str(k)+".png",900,560);
+  plot.cmd("reset");
+  plot.cmd("set datafile separator ','");
+  plot.cmd("set xrange [0:1000]; set yrange [0:600]; set size ratio -1; set tics nomirror out; set border 3");
+  plot.cmd("set xlabel 'x (micrometers)  -> chemokine rises'; set ylabel 'y (micrometers)'");
+  plot.cmd("set palette defined (0 '#ffffff', 1 '#cfe9e6'); unset colorbox");
+  plot.cmd("set title 'Chemotaxis, t = "+str(6*k)+" min:  grey b = 0,  blue b = 0.5,  orange b = 1' font ',13'");
+  plot.cmd("t0="+str(6*k));
+  plot.cmd("plot 'build/examples/chemotaxis_field.csv' using 1:2:3 with image notitle, 'build/examples/chemotaxis_history.csv' using ($1==t0?$2:NaN):3:($4==0?0x8a8f98:($4==1?0x5864a8:0xdf6b38)) with points pt 7 ps 0.55 lc rgb variable notitle");
+  plot.close();
+}
+end _dsl_
+savedsl(v,"build/visual/chemotaxis_drift.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/chemotaxis_drift.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+println("wrote images/chemotaxis_drift.png");
+f = system ffmpeg -y -v error -framerate 8 -i build/visual/chemotaxis_drift-frame-%d.png -vf "scale=600:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse" -loop 0 images/chemotaxis_drift.gif;
+if (f.code==0) { println("wrote images/chemotaxis_drift.gif"); } else { println("ffmpeg unavailable: frames are in build/visual/"); }

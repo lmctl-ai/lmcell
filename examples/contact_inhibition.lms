@@ -1,0 +1,66 @@
+# Contact inhibition: crowding sets a tissue's carrying capacity.
+# Cells divide at r = 0.02/min, die at d = 0.004/min and walk slowly so they mix. A rule on the
+# built-in "neighbors" signal (other live cells in the same 20 um voxel) pulls cycle entry
+# toward 0 with half-max K and Hill 2. Births balance deaths where r*(1 - H(N-1)) = d, so the
+# mean-field carrying capacity is N* = 1 + K*sqrt(r/d - 1) = 1 + 2K cells per voxel.
+# Sweep: K = 3, 5, 8 and an uninhibited control, one host process each.
+# Writes images/contact_inhibition.png.
+mkdir("build/examples");
+fn run_case(name, rule) {
+  p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+  let s=cell.sim(77).domain(0.0,200.0,0.0,200.0,20.0);
+  let t=s.cell_type("epithelial").radius(5.0).cycle(0.02).death(0.004).motility(0.5,5.0);
+  let K=float(${rule});
+  if (K > 0.0) { t.rule_toward("neighbors","cycle entry",0.0,K,2.0); }
+  s.scatter("epithelial",100,0.0,200.0,0.0,200.0);
+  let T=160.0;
+  if (K > 0.0) { T=900.0; }
+  let r=s.run(T,1.0);
+  if (K > 0.0) {
+    # Mean over the last 300 minutes against N* = 1 + 2K per voxel (100 voxels).
+    let c=r.counts(); let m=0.0; let n=0.0;
+    for (i in range(0,c.rows())) { if (c.get(i,0)>=600.0) { m=m+c.get(i,1); n=n+1.0; } }
+    cell.assert_close(m/n/100.0,1.0+2.0*K,0.12*(1.0+2.0*K));
+  }
+  r.counts().save_csv(${"build/examples/contact_" + name + ".csv"});
+end _dsl_
+  savedsl(p, "build/contact_inhibition.dslb");
+  r = system ${dsl_cli(p)} --dsl build/contact_inhibition.dslb;
+  if (r.code!=0) { println(r.stdout); println(r.stderr); }
+  assert(r.code==0);
+}
+run_case("k3", 3);
+run_case("k5", 5);
+run_case("k8", 8);
+run_case("free", 0);
+
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/contact_inhibition.png",900,500);
+plot.cmd("set datafile separator ','");
+plot.cmd("set tics nomirror out; set border 3; set grid back lc rgb '#e4e9ef'");
+plot.cmd("set multiplot title 'Contact inhibition caps density at the predicted 1 + 2K cells per voxel' font ',15'");
+plot.cmd("set lmargin at screen 0.08; set rmargin at screen 0.60; set tmargin at screen 0.83; set bmargin at screen 0.13");
+plot.cmd("set title 'Cells per voxel (100 voxels, mean of the tissue)'");
+plot.cmd("set xlabel 'Time (hours)'; set ylabel 'Cells per voxel'");
+plot.cmd("set xrange [0:15]; set yrange [0:22]; set xtics 3");
+plot.cmd("set key at graph 0.25, graph 0.99 left top Left reverse samplen 2 font ',10' nobox");
+plot.cmd("set label 1 'uninhibited (exponential)' at 0.3,13.6 left tc rgb '#555555' font ',10'");
+plot.cmd("plot 'build/examples/contact_free.csv' using ($1/60):($2/100) with lines lc rgb '#8a8f98' lw 2.5 notitle, 'build/examples/contact_k8.csv' using ($1/60):($2/100) with lines lc rgb '#df6b38' lw 2.5 title 'K = 8', 17 with lines lc rgb '#df6b38' dt 2 notitle, 'build/examples/contact_k5.csv' using ($1/60):($2/100) with lines lc rgb '#5864a8' lw 2.5 title 'K = 5', 11 with lines lc rgb '#5864a8' dt 2 notitle, 'build/examples/contact_k3.csv' using ($1/60):($2/100) with lines lc rgb '#007f86' lw 2.5 title 'K = 3', 7 with lines lc rgb '#007f86' dt 2 notitle, NaN with lines lc rgb '#333333' dt 2 title 'N* = 1 + 2K'");
+plot.cmd("unset label 1");
+plot.cmd("set lmargin at screen 0.725; set rmargin at screen 0.97; set tmargin at screen 0.83; set bmargin at screen 0.13");
+plot.cmd("set title 'Why: births meet deaths (K = 5)'");
+plot.cmd("set xlabel 'Other cells in the voxel'; set ylabel 'Rate per cell (1/min)' offset 1,0");
+plot.cmd("set xrange [0:20]; set yrange [0:0.022]; set xtics 5; set ytics 0.005");
+plot.cmd("set key at graph 0.98, graph 0.98 right top noreverse Right samplen 2 font ',10' nobox noopaque");
+plot.cmd("set arrow 1 from 10,0.004 to 10,0 lc rgb '#5864a8' dt 3 nohead");
+plot.cmd("set label 2 'N - 1 = 2K' at 10.6,0.0075 left tc rgb '#5864a8' font ',10'");
+plot.cmd("plot 0.02*(1-x**2/(25+x**2)) with lines lc rgb '#5864a8' lw 2.5 title 'division', 0.004 with lines lc rgb '#333333' lw 2 title 'death'");
+plot.cmd("unset multiplot");
+plot.close();
+end _dsl_
+savedsl(v,"build/contact_inhibition_plot.dslb");
+r = system ${dsl_cli(v)} --dsl build/contact_inhibition_plot.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+println("wrote images/contact_inhibition.png");

@@ -1,0 +1,101 @@
+# Tumour spheroid: why big tumours grow a dead core.
+# A disc of 2500 tumour cells sits in tissue fed from the domain edges (fixed nutrient = 1).
+# Every cell consumes nutrient; diffusion cannot keep up, so the centre starves.
+# Two Hill rules (PhysiCell "rule toward" form) turn the nutrient map into fate:
+#   nutrient increases cycle entry from 0 toward 0.002/min (half-max 0.4)  -> proliferating rim
+#   nutrient decreases apoptosis from 0.004/min toward 0 (half-max 0.15)   -> starving core dies
+# Expected: a viable rim about one penetration length sqrt(D/lambda) ~ 50-70 um thick around
+# an apoptotic core. The nutrient is generic and slower than real oxygen so that the
+# split uptake/diffusion step stays accurate at dt = 0.1 min (uptake*dt << 1).
+# Writes images/spheroid_necrosis.png (and images/spheroid_necrosis.gif when ffmpeg is present).
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(424242).domain(-300.0,300.0,-300.0,300.0,20.0);
+s.substrate("nutrient",3000.0,0.0,1.0,1.0);
+let t=s.cell_type("tumour").radius(8.0).exchange("nutrient",0.5,0.0).death(0.004);
+t.rule_toward("nutrient","cycle entry",0.002,0.4,2.0);
+t.rule_toward("nutrient","apoptosis",0.0,0.15,4.0);
+s.seed_disk("tumour",2500,0.0,0.0,200.0);
+let r=s.record(15.0).run(360.0,0.1);
+let c=r.cells();
+# Live fraction inside r < 80 um (core) and in 150 < r < 200 um (rim).
+let core=0.0; let corelive=0.0; let rim=0.0; let rimlive=0.0;
+for (i in range(0,c.rows())) {
+  let rr=sqrt(c.get(i,0)*c.get(i,0)+c.get(i,1)*c.get(i,1));
+  if (rr<80.0) { core=core+1.0; corelive=corelive+c.get(i,3); }
+  if (rr>150.0 && rr<200.0) { rim=rim+1.0; rimlive=rimlive+c.get(i,3); }
+}
+cell.assert_true(corelive/core < 0.45);
+cell.assert_true(rimlive/rim > 0.8);
+cell.assert_true(r.live() > 1500);
+c.save_csv("build/examples/spheroid_cells.csv");
+r.profiles().save_csv("build/examples/spheroid_field.csv");
+r.counts().save_csv("build/examples/spheroid_counts.csv");
+r.history().save_csv("build/examples/spheroid_history.csv");
+r.profile_history().save_csv("build/examples/spheroid_field_history.csv");
+end _dsl_
+savedsl(p, "build/spheroid_necrosis.dslb");
+r = system ${dsl_cli(p)} --dsl build/spheroid_necrosis.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+
+mkdir("build/visual");
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/spheroid_necrosis.png",960,520);
+plot.cmd("set datafile separator ','");
+plot.cmd("set tics nomirror out; set border 3");
+plot.cmd("set multiplot title 'A tumour disc starves its own centre: proliferating rim, apoptotic core (6 h)' font ',15'");
+# A: map
+plot.cmd("set lmargin at screen 0.08; set rmargin at screen 0.37; set tmargin at screen 0.84; set bmargin at screen 0.13");
+plot.cmd("set title 'Cells over the nutrient field (colour)'");
+plot.cmd("set size ratio -1; set xrange [-300:300]; set yrange [-300:300]");
+plot.cmd("set xtics 150; set ytics 150");
+plot.cmd("set xlabel 'x (micrometers)'; set ylabel 'y (micrometers)' offset 1.5,0");
+plot.cmd("set palette defined (0 '#f6f2ea', 0.5 '#a9c0dc', 1 '#34558a')");
+plot.cmd("set cbrange [0:1]; set colorbox user origin screen 0.377, screen 0.20 size screen 0.012, screen 0.55");
+plot.cmd("set cbtics 0.25 offset -0.6,0 font ',9'");
+plot.cmd("set key at -292,292 left top Left reverse samplen 1 font ',10' box lc rgb '#cccccc' opaque");
+plot.cmd("plot 'build/examples/spheroid_field.csv' using 1:2:3 with image notitle, 'build/examples/spheroid_cells.csv' using ($4==1?$1:NaN):2 with points pt 7 ps 0.4 lc rgb '#f08a24' title 'live', '' using ($4==0?$1:NaN):2 with points pt 7 ps 0.4 lc rgb '#111111' title 'apoptotic'");
+plot.cmd("unset colorbox; unset cblabel; set key noreverse Right");
+# B: radial profiles
+plot.cmd("set lmargin at screen 0.535; set rmargin at screen 0.745; set tmargin at screen 0.84; set bmargin at screen 0.13");
+plot.cmd("set size noratio; set autoscale; set xrange [0:300]; set yrange [0:1.05]");
+plot.cmd("set xtics 100; set ytics 0.25");
+plot.cmd("set grid back lc rgb '#e4e9ef'");
+plot.cmd("set title 'Along the radius'");
+plot.cmd("set xlabel 'Distance from centre (micrometers)'; set ylabel 'Level (0 to 1)' offset 0.5,0");
+plot.cmd("set key at 10,1.0 left top Left reverse samplen 2 font ',10' nobox noopaque");
+plot.cmd("set object 1 rect from 200,0 to 300,1.05 fc rgb '#f3f5f8' fs solid noborder behind");
+plot.cmd("set label 1 'no cells' at 250,0.15 center tc rgb '#8a8f98' font ',10'");
+plot.cmd("bin(r)=20*floor(r/20)+10");
+plot.cmd("plot 'build/examples/spheroid_field.csv' using (bin(sqrt($1**2+$2**2))):3 smooth unique with lines lc rgb '#34558a' lw 3 title 'nutrient', 'build/examples/spheroid_cells.csv' using (bin(sqrt($1**2+$2**2))):4 smooth unique with linespoints pt 7 ps 0.6 lc rgb '#f08a24' lw 3 title 'live fraction'");
+plot.cmd("unset object 1; unset label 1");
+# C: counts
+plot.cmd("set lmargin at screen 0.835; set rmargin at screen 0.98; set tmargin at screen 0.84; set bmargin at screen 0.13");
+plot.cmd("set autoscale; set xrange [0:6]; set yrange [0:*]; set xtics 2; set ytics auto");
+plot.cmd("set title 'Population'");
+plot.cmd("set xlabel 'Time (hours)'; set ylabel 'Cells' offset 1,0");
+plot.cmd("set key at graph 0.04, graph 0.50 left top Left reverse samplen 2 font ',10' nobox noopaque");
+plot.cmd("plot 'build/examples/spheroid_counts.csv' using ($1/60):2 with lines lc rgb '#f08a24' lw 3 title 'live', 'build/examples/spheroid_history.csv' using ($1/60):(1-$5) smooth frequency with linespoints pt 7 ps 0.5 lc rgb '#111111' lw 2 title 'apoptotic'");
+plot.cmd("unset multiplot");
+plot.close();
+for (k in range(0,25)) {
+  plot.png("build/visual/spheroid_necrosis-frame-"+str(k)+".png",640,600);
+  plot.cmd("reset");
+  plot.cmd("set datafile separator ','");
+  plot.cmd("set size ratio -1; set xrange [-300:300]; set yrange [-300:300]; set tics nomirror out; set border 3; set xtics 150; set ytics 150");
+  plot.cmd("set palette defined (0 '#f6f2ea', 0.5 '#a9c0dc', 1 '#34558a'); set cbrange [0:1]; set cblabel 'nutrient'");
+  plot.cmd("set title 'Tumour disc, t = "+str(k*15/60)+" h "+str((k*15)%60)+" min   (orange live, black apoptotic)' font ',12'");
+  plot.cmd("t0="+str(k*15)+".0");
+  plot.cmd("plot 'build/examples/spheroid_field_history.csv' every ::"+str(k*900)+"::"+str(k*900+899)+" using 2:3:4 with image notitle, 'build/examples/spheroid_history.csv' using ($1==t0?$2:NaN):3:($5==1?0xf08a24:0x111111) with points pt 7 ps 0.5 lc rgb variable notitle");
+  plot.close();
+}
+end _dsl_
+savedsl(v,"build/visual/spheroid_necrosis.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/spheroid_necrosis.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+println("wrote images/spheroid_necrosis.png");
+f = system ffmpeg -y -v error -framerate 6 -i build/visual/spheroid_necrosis-frame-%d.png -vf "scale=480:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse" -loop 0 images/spheroid_necrosis.gif;
+if (f.code==0) { println("wrote images/spheroid_necrosis.gif"); } else { println("ffmpeg unavailable: frames are in build/visual/"); }

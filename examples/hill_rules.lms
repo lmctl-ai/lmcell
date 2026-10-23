@@ -1,0 +1,168 @@
+# Hill rules: three ways a signal can tune a cell behaviour, checked against simulation.
+# Every rule reads a signal s through the Hill response H(s) = s^n / (K^n + s^n), here K = 1, n = 2.
+#   increases    r = r0 (1 + H)              at most doubles the base rate r0
+#   decreases    r = r0 (1 - H)              switches the behaviour off
+#   rule_toward  r = r0 + (r_sat - r0) H     PhysiCell's form: any target, even from r0 = 0
+# 18 cell types (3 forms x 6 signal levels, 1000 cells each) grow for 8 minutes in one run;
+# the measured growth rate ln(N/N0)/T must match each formula.
+# Writes images/hill_rules.png (drawn with lmdraw: rule diagram plus measured curves).
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(5150).domain(0.0,100.0,0.0,100.0,100.0);
+# Signal levels 0, 0.25, 0.5, 1, 2, 4.
+for (i in range(0,6)) {
+  let level=0.0;
+  if (i>0) { level=0.25*pow(2.0,float(i-1)); }
+  s.substrate("s"+str(i),0.0,0.0,level,-1.0);
+}
+for (i in range(0,6)) {
+  s.cell_type("inc"+str(i)).radius(5.0).cycle(0.05).rule("s"+str(i),"increases","cycle entry",1.0,2.0);
+  s.cell_type("dec"+str(i)).radius(5.0).cycle(0.10).rule("s"+str(i),"decreases","cycle entry",1.0,2.0);
+  s.cell_type("tow"+str(i)).radius(5.0).cycle(0.0).rule_toward("s"+str(i),"cycle entry",0.12,1.0,2.0);
+  s.seed("inc"+str(i),1000,50.0,50.0).seed("dec"+str(i),1000,50.0,50.0).seed("tow"+str(i),1000,50.0,50.0);
+}
+let r=s.run(8.0,0.05);
+# Check the strongest signal: H(4) = 16/17.
+cell.assert_close(float(r.live_of("inc5")),cell.eval("1000*exp(8*0.05*(1+16/17))"),250.0);
+cell.assert_close(float(r.live_of("dec5")),cell.eval("1000*exp(8*0.10*(1-16/17))"),110.0);
+cell.assert_close(float(r.live_of("tow5")),cell.eval("1000*exp(8*0.12*16/17)"),180.0);
+cell.assert_true(r.live_of("tow0")==1000);
+r.type_counts().save_csv("build/examples/hill_rules_counts.csv");
+end _dsl_
+savedsl(p, "build/hill_rules.dslb");
+r = system ${dsl_cli(p)} --dsl build/hill_rules.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+
+# Measured rates from the last row of the per-type counts (time, then types in declaration order).
+fn ln(x) { let y = (x - 1.0) / (x + 1.0); let term = y; let total = 0.0; for (k in range(0, 400)) { total = total + term / (2 * k + 1); term = term * y * y; if (abs(term) < 0.000000000001) { break; } } return 2.0 * total; }
+rows = split(trim(read_file("build/examples/hill_rules_counts.csv")), "\n");
+last = split(rows[rows.len() - 1], ",");
+LV = [0.0, 0.25, 0.5, 1.0, 2.0, 4.0];
+fn H(x) { return x * x / (1.0 + x * x); }
+# Interpolated whole numbers arrive in the DSL as ints; nudge them so every coordinate is a float.
+fn fl(v) { if (v == floor(v)) { return v + 0.001; } return v; }
+fn gx(x) { return 520.0 + x / 4.0 * 330.0; }
+fn gy(v) { return 470.0 - v / 0.16 * 330.0; }
+fn curve(kind) {
+  let pts = "";
+  for (j in range(0, 81)) {
+    let x = j * 0.05;
+    let v = 0.0;
+    if (kind == 0) { v = 0.05 * (1.0 + H(x)); }
+    if (kind == 1) { v = 0.10 * (1.0 - H(x)); }
+    if (kind == 2) { v = 0.12 * H(x); }
+    pts = pts + str(gx(x)) + " " + str(gy(v)) + " ";
+  }
+  return pts;
+}
+meas = [[], [], []];
+worst = 0.0;
+for (i in range(0, 6)) {
+  for (kind in range(0, 3)) {
+    let n = num(last[1 + 3 * i + kind]);
+    let rate = ln(n / 1000.0) / 8.0;
+    push(meas[kind], rate);
+    let want = 0.0;
+    if (kind == 0) { want = 0.05 * (1.0 + H(LV[i])); }
+    if (kind == 1) { want = 0.10 * (1.0 - H(LV[i])); }
+    if (kind == 2) { want = 0.12 * H(LV[i]); }
+    worst = max(worst, abs(rate - want));
+  }
+}
+println(sprintf("largest |measured - formula| growth rate: %.4f per minute", worst));
+assert(worst < 0.012);
+CI = curve(0); CD = curve(1); CT = curve(2);
+dots = [];
+for (kind in range(0, 3)) {
+  let d = [];
+  for (i in range(0, 6)) { push(d, [fl(gx(LV[i])), fl(gy(meas[kind][i]))]); }
+  push(dots, d);
+}
+worst_txt = sprintf("largest deviation %.4f /min (Poisson noise, 1000 cells)", worst);
+
+mkdir("build/visual");
+mkdir("build/rendered");
+mkdir("images");
+v = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+scene.canvas(900, 560, "#ffffff");
+scene.text(40.0, 44.0, 22.0, "One signal, three rule forms: what a Hill rule does to a rate", "#1f2933").set_attr("font-weight", "700");
+scene.text(40.0, 70.0, 13.5, "Lines: the formula. Dots: growth rate measured from 1000 simulated cells per point (ln(N/N0)/T over 8 min).", "#52606d");
+
+# Left: the rule pipeline.
+let sig = scene.rect(40.0, 110.0, 150.0, 56.0, "#eef2f7");
+sig.set_attr("rx", "10");
+sig.set_attr("stroke", "#9aa5b1");
+scene.text(115.0, 135.0, 14.0, "signal s", "#1f2933").set_attr("text-anchor", "middle").set_attr("font-weight", "700");
+scene.text(115.0, 154.0, 11.5, "substrate or neighbors", "#52606d").set_attr("text-anchor", "middle");
+scene.arrow(192.0, 138.0, 226.0, 138.0, "#52606d", 2.0);
+let hb = scene.rect(228.0, 110.0, 216.0, 56.0, "#eef2f7");
+hb.set_attr("rx", "10");
+hb.set_attr("stroke", "#9aa5b1");
+scene.text(336.0, 134.0, 14.0, "Hill response", "#1f2933").set_attr("text-anchor", "middle").set_attr("font-weight", "700");
+scene.text(336.0, 154.0, 12.5, "H = sⁿ / (Kⁿ + sⁿ), between 0 and 1", "#52606d").set_attr("text-anchor", "middle");
+scene.arrow(336.0, 168.0, 336.0, 196.0, "#52606d", 2.0);
+
+let c1 = scene.rect(40.0, 200.0, 404.0, 90.0, "#fff4ec");
+c1.set_attr("rx", "10");
+c1.set_attr("stroke", "#df6b38");
+scene.text(56.0, 226.0, 15.0, "increases", "#b4501f").set_attr("font-weight", "700");
+scene.text(170.0, 226.0, 15.0, "r = r₀ (1 + H)", "#1f2933");
+scene.text(56.0, 250.0, 12.5, "Can at most double the base rate, and does nothing when r₀ = 0 (an oxygen-starved, non-dividing cell stays put).", "#52606d", 372.0);
+
+let c2 = scene.rect(40.0, 302.0, 404.0, 80.0, "#eef0fa");
+c2.set_attr("rx", "10");
+c2.set_attr("stroke", "#5864a8");
+scene.text(56.0, 328.0, 15.0, "decreases", "#3f4a8a").set_attr("font-weight", "700");
+scene.text(170.0, 328.0, 15.0, "r = r₀ (1 − H)", "#1f2933");
+scene.text(56.0, 352.0, 12.5, "Switches the behaviour off: contact inhibition, oxygen sparing a cell from apoptosis.", "#52606d", 372.0);
+
+let c3 = scene.rect(40.0, 394.0, 404.0, 96.0, "#e9f6f5");
+c3.set_attr("rx", "10");
+c3.set_attr("stroke", "#007f86");
+scene.text(56.0, 420.0, 15.0, "rule_toward", "#006066").set_attr("font-weight", "700");
+scene.text(170.0, 420.0, 15.0, "r = r₀ + (r_sat − r₀) H", "#1f2933");
+scene.text(56.0, 444.0, 12.5, "PhysiCell's saturating form: pulls the rate toward any value, up or down, even from r₀ = 0. A growth factor that wakes quiescent cells needs this.", "#52606d", 372.0);
+scene.text(40.0, 520.0, 12.0, ${worst_txt}, "#52606d");
+
+# Right: measured versus formula.
+scene.axes(520.0, 140.0, 330.0, 330.0, 0.0, 4.0, 0.0, 0.16, 8, "#9aa5b1");
+scene.text(685.0, 512.0, 13.0, "signal s / K", "#52606d").set_attr("text-anchor", "middle");
+let yl = scene.text(462.0, 305.0, 13.0, "division rate (1/min)", "#52606d");
+yl.set_attr("text-anchor", "middle");
+yl.set_attr("transform", "rotate(-90 462 305)");
+scene.text(685.0, 124.0, 14.0, "K = 1, n = 2", "#1f2933").set_attr("text-anchor", "middle").set_attr("font-weight", "700");
+scene.line(520.0, ${fl(gy(0.10))}, 850.0, ${fl(gy(0.10))}, "#df6b38", 1.0).set_attr("stroke-dasharray", "4 4");
+scene.text(846.0, ${fl(gy(0.10) - 6.0)}, 11.0, "2 r₀ cap", "#b4501f").set_attr("text-anchor", "end");
+scene.polyline(${CI}, "#df6b38", 2.5);
+scene.polyline(${CD}, "#5864a8", 2.5);
+scene.polyline(${CT}, "#007f86", 2.5);
+scene.circle(${dots[0][0][0]}, ${dots[0][0][1]}, 5.0, "#df6b38");
+scene.circle(${dots[0][1][0]}, ${dots[0][1][1]}, 5.0, "#df6b38");
+scene.circle(${dots[0][2][0]}, ${dots[0][2][1]}, 5.0, "#df6b38");
+scene.circle(${dots[0][3][0]}, ${dots[0][3][1]}, 5.0, "#df6b38");
+scene.circle(${dots[0][4][0]}, ${dots[0][4][1]}, 5.0, "#df6b38");
+scene.circle(${dots[0][5][0]}, ${dots[0][5][1]}, 5.0, "#df6b38");
+scene.circle(${dots[1][0][0]}, ${dots[1][0][1]}, 5.0, "#5864a8");
+scene.circle(${dots[1][1][0]}, ${dots[1][1][1]}, 5.0, "#5864a8");
+scene.circle(${dots[1][2][0]}, ${dots[1][2][1]}, 5.0, "#5864a8");
+scene.circle(${dots[1][3][0]}, ${dots[1][3][1]}, 5.0, "#5864a8");
+scene.circle(${dots[1][4][0]}, ${dots[1][4][1]}, 5.0, "#5864a8");
+scene.circle(${dots[1][5][0]}, ${dots[1][5][1]}, 5.0, "#5864a8");
+scene.circle(${dots[2][0][0]}, ${dots[2][0][1]}, 5.0, "#007f86");
+scene.circle(${dots[2][1][0]}, ${dots[2][1][1]}, 5.0, "#007f86");
+scene.circle(${dots[2][2][0]}, ${dots[2][2][1]}, 5.0, "#007f86");
+scene.circle(${dots[2][3][0]}, ${dots[2][3][1]}, 5.0, "#007f86");
+scene.circle(${dots[2][4][0]}, ${dots[2][4][1]}, 5.0, "#007f86");
+scene.circle(${dots[2][5][0]}, ${dots[2][5][1]}, 5.0, "#007f86");
+scene.text(700.0, ${fl(gy(0.078))}, 12.0, "increases, r₀ = 0.05", "#b4501f");
+scene.text(700.0, ${fl(gy(0.034))}, 12.0, "decreases, r₀ = 0.10", "#3f4a8a");
+scene.text(690.0, ${fl(gy(0.135))}, 12.0, "toward 0.12 from r₀ = 0", "#006066");
+scene.render_png("build/rendered/hill_rules.png", 900, 560, 1);
+end _dsl_
+savedsl(v,"build/visual/hill_rules.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/hill_rules.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+copy_file("build/rendered/hill_rules.png", "images/hill_rules.png");
+println("wrote images/hill_rules.png");

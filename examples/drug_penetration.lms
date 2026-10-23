@@ -1,0 +1,94 @@
+# Drug penetration: why tumour cells far from a blood vessel survive chemotherapy.
+# A vessel along the left edge holds the drug at 1. The drug diffuses (D = 2000 um^2/min) and is
+# cleared (0.2/min), so its steady profile is c(x) = cosh((W - x)/L) / cosh(W/L) with
+# penetration length L = sqrt(D/k) = 100 um. Cells die at 0.0005/min plus a Hill-shaped drug
+# effect saturating at 0.02/min (half-max 0.3, Hill 2).
+# Known answer: survival after T = 8 h is S(x) = exp(-T * death(c(x))): ~0 at the vessel and
+# most cells surviving beyond ~3L, the classic "drug penetration barrier".
+# Writes images/drug_penetration.png (and images/drug_penetration.gif when ffmpeg is present).
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(31337).domain(0.0,600.0,0.0,240.0,30.0);
+s.substrate("drug",2000.0,0.2,0.0,-1.0).edge("drug","xmin",1.0);
+s.cell_type("tumour").radius(8.0).death(0.0005).rule_toward("drug","apoptosis",0.02,0.3,2.0);
+s.scatter("tumour",1500,0.0,600.0,0.0,240.0);
+let r=s.record(20.0).diffusion_dt(0.01).run(480.0,0.1);
+# Steady drug profile against the cosh law (pinned voxel centre x=15, no flux at x=600).
+# Diffusion substeps of 0.01 min keep D*dt/h^2 small: BioFVM re-pins edge voxels between its
+# split sweeps, so a coarse diffusion step would pull the profile below the cosh law.
+let f=r.profiles();
+let L=cell.eval("sqrt(2000/0.2)");
+for (i in range(0,20)) {
+  let x=f.get(i,0);
+  cell.assert_close(f.get(i,2),cell.eval("cosh(("+str(600.0-x)+")/"+str(L)+")/cosh(585/"+str(L)+")"),0.015);
+}
+# Survival near the vessel and far from it.
+let c=r.cells();
+let nn=0.0; let na=0.0; let farn=0.0; let fara=0.0;
+for (i in range(0,c.rows())) {
+  if (c.get(i,0)<100.0) { nn=nn+1.0; na=na+c.get(i,3); }
+  if (c.get(i,0)>500.0) { farn=farn+1.0; fara=fara+c.get(i,3); }
+}
+cell.assert_true(na/nn < 0.05);
+# Theory at the far bin centre x = 550: c = cosh(50/L)/cosh(585/L), S = exp(-480*death(c)).
+let cf=cell.eval("cosh(50/"+str(L)+")/cosh(585/"+str(L)+")");
+let sf=cell.eval("exp(-480*(0.0005+0.0195*"+str(cf*cf)+"/(0.09+"+str(cf*cf)+")))");
+cell.assert_close(fara/farn,sf,0.08);
+c.save_csv("build/examples/drug_cells.csv");
+f.save_csv("build/examples/drug_field.csv");
+r.history().save_csv("build/examples/drug_history.csv");
+r.profile_history().save_csv("build/examples/drug_field_history.csv");
+end _dsl_
+savedsl(p, "build/drug_penetration.dslb");
+r = system ${dsl_cli(p)} --dsl build/drug_penetration.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+
+mkdir("build/visual");
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/drug_penetration.png",900,600);
+plot.cmd("set datafile separator ','");
+plot.cmd("set tics nomirror out; set border 3");
+plot.cmd("L=sqrt(2000/0.2); c(x)=cosh((600-x)/L)/cosh(585/L); H(u)=u**2/(0.3**2+u**2); S(x)=exp(-480*(0.0005+(0.02-0.0005)*H(c(x))))");
+plot.cmd("set multiplot title 'Cells far from the vessel escape the drug (vessel at x = 0, 8 h exposure)' font ',15'");
+plot.cmd("set lmargin at screen 0.09; set rmargin at screen 0.86; set tmargin at screen 0.87; set bmargin at screen 0.59");
+plot.cmd("set title ''");
+plot.cmd("set xrange [0:600]; set yrange [0:240]; set xtics 100 format ''; set ytics 120");
+plot.cmd("set ylabel 'y (micrometers)'");
+plot.cmd("set palette defined (0 '#fbfbfd', 0.3 '#e9d9ef', 1 '#8c4a9e'); set cbrange [0:1]");
+plot.cmd("set colorbox user origin screen 0.875, screen 0.60 size screen 0.015, screen 0.28; set cblabel 'drug' offset -0.5,0; set cbtics 0.5");
+plot.cmd("set key at screen 0.86, screen 0.915 right top horizontal samplen 1 font ',10'");
+plot.cmd("plot 'build/examples/drug_field.csv' using 1:2:3 with image notitle, 'build/examples/drug_cells.csv' using ($4==1?$1:NaN):2 with points pt 7 ps 0.45 lc rgb '#0b8f8f' title 'live', '' using ($4==0?$1:NaN):2 with points pt 6 ps 0.45 lc rgb '#555555' title 'apoptotic'");
+plot.cmd("unset colorbox; unset cblabel");
+plot.cmd("set lmargin at screen 0.09; set rmargin at screen 0.86; set tmargin at screen 0.55; set bmargin at screen 0.11");
+plot.cmd("set title ''; set xrange [0:600]; set yrange [0:1.05]; set xtics 100 format '%g'; set ytics 0.25");
+plot.cmd("set grid back lc rgb '#e4e9ef'");
+plot.cmd("set xlabel 'Distance from the vessel (micrometers)'; set ylabel 'Level (0 to 1)'");
+plot.cmd("set key at 595,0.53 right top vertical maxrows 4 samplen 2 font ',10' box lc rgb '#cccccc' opaque");
+plot.cmd("set label 1 'L = 100 µm' at 100,0.93 center tc rgb '#8c4a9e' font ',10'");
+plot.cmd("set arrow 1 from 100,0.88 to 100,0.40 nohead dt 3 lc rgb '#8c4a9e'");
+plot.cmd("bin(x)=30*floor(x/30)+15");
+plot.cmd("plot 'build/examples/drug_field.csv' using 1:3 smooth unique with lines lc rgb '#8c4a9e' lw 3 title 'drug (BioFVM)', c(x) with lines lc rgb '#3b1a45' dt 2 lw 1.5 title 'cosh law', 'build/examples/drug_cells.csv' using (bin($1)):4 smooth unique with linespoints pt 7 ps 0.7 lc rgb '#0b8f8f' lw 3 title 'surviving fraction', S(x) with lines lc rgb '#064f4f' dt 2 lw 1.5 title 'exp(-T death(c))'");
+plot.cmd("unset multiplot");
+plot.close();
+for (k in range(0,25)) {
+  plot.png("build/visual/drug_penetration-frame-"+str(k)+".png",800,400);
+  plot.cmd("reset");
+  plot.cmd("set datafile separator ','");
+  plot.cmd("set size ratio -1; set xrange [0:600]; set yrange [0:240]; set tics nomirror out; set border 3; set xtics 100; set ytics 120");
+  plot.cmd("set palette defined (0 '#fbfbfd', 0.3 '#e9d9ef', 1 '#8c4a9e'); set cbrange [0:1]; set cblabel 'drug'");
+  plot.cmd("set xlabel 'Distance from the vessel (micrometers)'");
+  plot.cmd("set title 'Drug from a vessel, t = "+str(k*20)+" min   (teal live, grey apoptotic)' font ',12'");
+  plot.cmd("t0="+str(k*20)+".0");
+  plot.cmd("plot 'build/examples/drug_field_history.csv' every ::"+str(k*160)+"::"+str(k*160+159)+" using 2:3:4 with image notitle, 'build/examples/drug_history.csv' using ($1==t0&&$5==1?$2:NaN):3 with points pt 7 ps 0.6 lc rgb '#0b8f8f' notitle, '' using ($1==t0&&$5==0?$2:NaN):3 with points pt 6 ps 0.6 lc rgb '#555555' notitle");
+  plot.close();
+}
+end _dsl_
+savedsl(v,"build/visual/drug_penetration.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/drug_penetration.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+println("wrote images/drug_penetration.png");
+f = system ffmpeg -y -v error -framerate 6 -i build/visual/drug_penetration-frame-%d.png -vf "scale=600:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse" -loop 0 images/drug_penetration.gif;
+if (f.code==0) { println("wrote images/drug_penetration.gif"); } else { println("ffmpeg unavailable: frames are in build/visual/"); }

@@ -1,0 +1,59 @@
+# Drug resistance: therapy selects a rare resistant clone, a drug holiday lets it fade.
+# 2100 tumour cells, 100 of them (4.8%) resistant. Sensitive cells divide at 0.0010/min; the drug
+# pushes their apoptosis from 0.0001 toward 0.0050/min (Hill: half-max 0.2, n = 2). Resistant
+# cells ignore the drug but pay a fitness cost: they divide at 0.0008/min and die at 0.0002/min.
+# Known answer: each clone grows as exp((b - d) t), so the resistant fraction follows a logistic
+# curve in time, f(t) = f0 e^(s t) / (1 - f0 + f0 e^(s t)), with selection coefficient
+# s = net growth (resistant) - net growth (sensitive):
+#   on drug  s = 0.0006 - (0.0010 - 0.0001 - 0.0049*H(1)) = +0.0044/min -> takeover within a day
+#   holiday  s = 0.0006 - 0.0009 = -0.0003/min                          -> slow decline
+# Writes images/drug_resistance.png.
+mkdir("build/examples");
+fn therapy(name, dose) {
+  p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+  let s=cell.sim(99).domain(0.0,100.0,0.0,100.0,100.0);
+  s.substrate("drug",0.0,0.0,float(${dose}),-1.0);
+  s.cell_type("sensitive").radius(5.0).cycle(0.0010).death(0.0001).rule_toward("drug","apoptosis",0.0050,0.2,2.0);
+  s.cell_type("resistant").radius(5.0).cycle(0.0008).death(0.0002);
+  s.seed("sensitive",2000,50.0,50.0).seed("resistant",100,50.0,50.0);
+  let r=s.run(2400.0,5.0);
+  # Resistant clone: 100 e^(0.0006*2400); birth-death noise sd = sqrt(n0 (b+d)/(b-d) e^(rt) (e^(rt)-1)) ~ 47.
+  cell.assert_close(float(r.live_of("resistant")),cell.eval("100*exp(0.0006*2400)"),190.0);
+  r.type_counts().save_csv(${"build/examples/resistance_" + name + ".csv"});
+end _dsl_
+  savedsl(p, "build/drug_resistance.dslb");
+  r = system ${dsl_cli(p)} --dsl build/drug_resistance.dslb;
+  if (r.code!=0) { println(r.stdout); println(r.stderr); }
+  assert(r.code==0);
+}
+therapy("holiday", 0);
+therapy("drug", 1);
+
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/drug_resistance.png",900,500);
+plot.cmd("set datafile separator ','");
+plot.cmd("set tics nomirror out; set border 3; set grid back lc rgb '#e4e9ef'");
+plot.cmd("H=1.0/(1+0.04); gs=0.0010-0.0001-0.0049*H; gr=0.0006; f0=100.0/2100");
+plot.cmd("f(t,s)=f0*exp(s*t)/(1-f0+f0*exp(s*t))");
+plot.cmd("set multiplot title 'Therapy selects a rare resistant clone; a drug holiday lets the cheaper cells win back' font ',14'");
+plot.cmd("set lmargin at screen 0.09; set rmargin at screen 0.50; set tmargin at screen 0.82; set bmargin at screen 0.13");
+plot.cmd("set title 'Clone sizes on drug (log scale)'");
+plot.cmd("set logscale y; set yrange [1:5000]; set xrange [0:40]; set xtics 8");
+plot.cmd("set xlabel 'Time (hours)'; set ylabel 'Live cells'");
+plot.cmd("set key at graph 0.98, graph 0.98 right top samplen 2 font ',10' nobox");
+plot.cmd("plot 'build/examples/resistance_drug.csv' using ($1/60):2 with lines lc rgb '#5864a8' lw 3 title 'sensitive', 2000*exp(gs*60*x) with lines lc rgb '#1d2350' dt 2 lw 1.5 title '2000 e^{(b-d)t}', 'build/examples/resistance_drug.csv' using ($1/60):3 with lines lc rgb '#df6b38' lw 3 title 'resistant', 100*exp(gr*60*x) with lines lc rgb '#7a2a08' dt 2 lw 1.5 title '100 e^{(b-d)t}'");
+plot.cmd("unset logscale y");
+plot.cmd("set lmargin at screen 0.60; set rmargin at screen 0.97");
+plot.cmd("set title 'Resistant fraction'");
+plot.cmd("set yrange [0:1]; set ytics 0.25; set ylabel 'Fraction resistant'");
+plot.cmd("set key at graph 0.98, graph 0.55 right top samplen 2 font ',10' nobox");
+plot.cmd("plot 'build/examples/resistance_drug.csv' using ($1/60):($3/($2+$3)) with lines lc rgb '#df6b38' lw 3 title 'on drug', f(60*x,gr-gs) with lines lc rgb '#7a2a08' dt 2 lw 1.5 title 'logistic, s = +0.0044', 'build/examples/resistance_holiday.csv' using ($1/60):($3/($2+$3)) with lines lc rgb '#007f86' lw 3 title 'drug holiday', f(60*x,-0.0003) with lines lc rgb '#003c40' dt 2 lw 1.5 title 'logistic, s = -0.0003'");
+plot.cmd("unset multiplot");
+plot.close();
+end _dsl_
+savedsl(v,"build/drug_resistance_plot.dslb");
+r = system ${dsl_cli(v)} --dsl build/drug_resistance_plot.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+println("wrote images/drug_resistance.png");

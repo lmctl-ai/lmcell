@@ -1,0 +1,86 @@
+# Scratch-wound assay: do cells close a wound by moving or by dividing?
+# Two confluent sheets (7 cells per 20 um voxel, the contact-inhibited carrying capacity 1 + 2K
+# from contact_inhibition.lms) face a 200 um scratch. Same cells, two experiments:
+#   migration only        walk 0.5 um/min with 10 min persistence, no division or death
+#   migration + division  also divide at 0.02/min and die at 0.004/min, with crowding
+#                         (neighbors, half-max 3, Hill 2) pulling division toward 0
+# Expected: with division the edge advances as a Fisher-KPP front, c = 2*sqrt(D*(r-d)) with
+# D = v^2*tau/2 = 1.25 um^2/min, about 17 um/h per edge, so the scratch refills in hours;
+# by migration alone, cells only diffuse in and dilute the sheets behind them.
+# Writes images/wound_closure.png (and images/wound_closure.gif when ffmpeg is present).
+mkdir("build/examples");
+fn assay(name, grow) {
+  p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+  let s=cell.sim(2024).domain(0.0,600.0,0.0,200.0,20.0);
+  let t=s.cell_type("keratinocyte").radius(5.0).motility(0.5,10.0);
+  if (${grow} == 1) { t.cycle(0.02).death(0.004).rule_toward("neighbors","cycle entry",0.0,3.0,2.0); }
+  s.scatter("keratinocyte",700,0.0,200.0,0.0,200.0).scatter("keratinocyte",700,400.0,600.0,0.0,200.0);
+  let r=s.record(60.0).run(1440.0,1.0);
+  # Cells inside the scratch at the end, relative to a confluent 100-voxel strip (700 cells).
+  let c=r.cells(); let inside=0.0;
+  for (i in range(0,c.rows())) { if (c.get(i,3)==1.0 && c.get(i,0)>200.0 && c.get(i,0)<400.0) { inside=inside+1.0; } }
+  if (${grow} == 1) { cell.assert_true(inside/700.0 > 0.75); } else { cell.assert_true(inside/700.0 < 0.6); }
+  r.history().save_csv(${"build/examples/wound_" + name + ".csv"});
+end _dsl_
+  savedsl(p, "build/wound_closure.dslb");
+  r = system ${dsl_cli(p)} --dsl build/wound_closure.dslb;
+  if (r.code!=0) { println(r.stdout); println(r.stderr); }
+  assert(r.code==0);
+}
+assay("move", 0);
+assay("grow", 1);
+
+mkdir("build/visual");
+mkdir("images");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("images/wound_closure.png",900,640);
+plot.cmd("set datafile separator ','");
+plot.cmd("set tics nomirror out; set border 3");
+plot.cmd("set multiplot title 'Closing a 200 µm scratch: division refills it, migration alone only spreads it' font ',15'");
+plot.cmd("set xrange [0:600]; set yrange [0:200]; set xtics 200 format ''; set ytics 100 format ''");
+plot.cmd("set object 1 rect from 200,0 to 400,200 fc rgb '#fdf1e6' fs solid noborder behind");
+plot.cmd("tm(t)=t");
+# Four snapshots per experiment: 0, 4, 12, 24 h.
+plot.cmd("W=0.225; G=0.01; X0=0.05");
+plot.cmd("set tmargin at screen 0.85; set bmargin at screen 0.65");
+plot.cmd("set lmargin at screen X0; set rmargin at screen X0+W; set ylabel 'migration only' tc rgb '#5864a8' offset 1,0; set title '0 h' offset 0,-0.6; plot 'build/examples/wound_move.csv' using ($1==0&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#5864a8' notitle");
+plot.cmd("unset ylabel");
+plot.cmd("set lmargin at screen X0+(W+G); set rmargin at screen X0+(W+G)+W; set title '4 h'; plot 'build/examples/wound_move.csv' using ($1==240&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#5864a8' notitle");
+plot.cmd("set lmargin at screen X0+2*(W+G); set rmargin at screen X0+2*(W+G)+W; set title '12 h'; plot 'build/examples/wound_move.csv' using ($1==720&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#5864a8' notitle");
+plot.cmd("set lmargin at screen X0+3*(W+G); set rmargin at screen X0+3*(W+G)+W; set title '24 h'; plot 'build/examples/wound_move.csv' using ($1==1440&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#5864a8' notitle");
+plot.cmd("set tmargin at screen 0.58; set bmargin at screen 0.38");
+plot.cmd("set lmargin at screen X0; set rmargin at screen X0+W; set ylabel 'with division' tc rgb '#df6b38' offset 1,0; set title '0 h'; plot 'build/examples/wound_grow.csv' using ($1==0&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#df6b38' notitle");
+plot.cmd("set lmargin at screen X0+(W+G); set rmargin at screen X0+(W+G)+W; unset ylabel; set title '4 h'; plot 'build/examples/wound_grow.csv' using ($1==240&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#df6b38' notitle");
+plot.cmd("set lmargin at screen X0+2*(W+G); set rmargin at screen X0+2*(W+G)+W; set title '12 h'; plot 'build/examples/wound_grow.csv' using ($1==720&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#df6b38' notitle");
+plot.cmd("set lmargin at screen X0+3*(W+G); set rmargin at screen X0+3*(W+G)+W; set title '24 h'; plot 'build/examples/wound_grow.csv' using ($1==1440&&$5==1?$2:NaN):3 with points pt 7 ps 0.18 lc rgb '#df6b38' notitle");
+plot.cmd("unset object 1");
+# Scratch filling over time.
+plot.cmd("set lmargin at screen 0.09; set rmargin at screen 0.97; set tmargin at screen 0.30; set bmargin at screen 0.10");
+plot.cmd("set title ''; set xrange [0:24]; set yrange [0:1.1]; set xtics 4 format '%g'; set ytics 0.5 format '%g'");
+plot.cmd("set grid back lc rgb '#e4e9ef'");
+plot.cmd("set xlabel 'Time (hours)' offset 0,0.4; set ylabel 'Scratch filled' tc rgb '#000000' offset 1,0");
+plot.cmd("set key at graph 0.98, graph 0.78 right top samplen 2 font ',10' nobox");
+plot.cmd("inwound(x)=(x>200&&x<400)?1.0/700:0");
+plot.cmd("plot 'build/examples/wound_grow.csv' using ($1/60):($5*inwound($2)) smooth frequency with linespoints pt 7 ps 0.5 lw 2.5 lc rgb '#df6b38' title 'migration + division', 'build/examples/wound_move.csv' using ($1/60):($5*inwound($2)) smooth frequency with linespoints pt 7 ps 0.5 lw 2.5 lc rgb '#5864a8' title 'migration only', 1 with lines lc rgb '#333333' dt 2 title 'confluent'");
+plot.cmd("unset multiplot");
+plot.close();
+for (k in range(0,25)) {
+  plot.png("build/visual/wound_closure-frame-"+str(k)+".png",700,420);
+  plot.cmd("reset");
+  plot.cmd("set datafile separator ','");
+  plot.cmd("set xrange [0:600]; set yrange [0:200]; set size ratio -1; set tics nomirror out; set border 3; set xtics 100; set ytics 100");
+  plot.cmd("set object 1 rect from 200,0 to 400,200 fc rgb '#fdf1e6' fs solid noborder behind");
+  plot.cmd("set title 'Scratch assay with division, t = "+str(k)+" h' font ',12'");
+  plot.cmd("set xlabel 'x (micrometers)'");
+  plot.cmd("t0="+str(k*60)+".0");
+  plot.cmd("plot 'build/examples/wound_grow.csv' using ($1==t0&&$5==1?$2:NaN):3 with points pt 7 ps 0.3 lc rgb '#df6b38' notitle");
+  plot.close();
+}
+end _dsl_
+savedsl(v,"build/visual/wound_closure.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/wound_closure.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+println("wrote images/wound_closure.png");
+f = system ffmpeg -y -v error -framerate 5 -i build/visual/wound_closure-frame-%d.png -vf "scale=560:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=32[p];[b][p]paletteuse" -loop 0 images/wound_closure.gif;
+if (f.code==0) { println("wrote images/wound_closure.gif"); } else { println("ffmpeg unavailable: frames are in build/visual/"); }

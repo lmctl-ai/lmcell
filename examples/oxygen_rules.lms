@@ -22,7 +22,7 @@ plot.cmd("set lmargin 14");
 plot.cmd("set rmargin 4");
 plot.cmd("set tics nomirror");
 plot.cmd("set grid back lc rgb '#e4e9ef'");
-plot.cmd("set key outside top center horizontal");
+plot.cmd("set key outside bottom center horizontal");
 plot.cmd("set style line 1 lc rgb '#007f86' lw 3");
 plot.cmd("set style line 2 lc rgb '#df6b38' lw 3");
 plot.cmd("set style line 3 lc rgb '#5864a8' lw 3");

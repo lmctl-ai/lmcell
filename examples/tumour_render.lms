@@ -1,0 +1,113 @@
+# The starving tumour disc in 3D: the same model as spheroid_necrosis.lms, path-traced.
+# lmcell runs the tumour (2500 cells, 6 h), lmplot paints the final nutrient field as a ground
+# texture, and lmblender (Cycles) renders every cell as a sphere on it: orange = live,
+# charcoal = apoptotic. The dead core sits where the ground is palest (least nutrient).
+# Cells are point agents in lmcell, so they are drawn at 3.5 um radius to keep them apart.
+# Writes images/tumour_render.png (palette-reduced with ffmpeg when available).
+mkdir("build/examples");
+p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+let s=cell.sim(424242).domain(-300.0,300.0,-300.0,300.0,20.0);
+s.substrate("nutrient",3000.0,0.0,1.0,1.0);
+let t=s.cell_type("tumour").radius(8.0).exchange("nutrient",0.5,0.0).death(0.004);
+t.rule_toward("nutrient","cycle entry",0.002,0.4,2.0);
+t.rule_toward("nutrient","apoptosis",0.0,0.15,4.0);
+s.seed_disk("tumour",2500,0.0,0.0,200.0);
+let r=s.run(360.0,0.1);
+cell.assert_true(r.live() > 1500 && r.cells().rows() > r.live() + 400);
+r.cells().save_csv("build/examples/tumour_render_cells.csv");
+r.profiles().save_csv("build/examples/tumour_render_field.csv");
+end _dsl_
+savedsl(p, "build/tumour_render.dslb");
+r = system ${dsl_cli(p)} --dsl build/tumour_render.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+
+# Ground texture: the nutrient field, edge to edge, no axes.
+mkdir("build/visual");
+v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+plot.png("build/visual/tumour_ground.png",600,600);
+plot.cmd("set datafile separator ','");
+plot.cmd("set lmargin at screen 0; set rmargin at screen 1; set tmargin at screen 1; set bmargin at screen 0; unset border; unset tics; unset key; unset colorbox");
+plot.cmd("set xrange [-290:290]; set yrange [-290:290]");
+plot.cmd("set palette defined (0 '#f6f2ea', 0.5 '#a9c0dc', 1 '#34558a'); set cbrange [0:1]");
+plot.cmd("set view map; set pm3d map interpolate 4,4; set dgrid3d 30,30 splines");
+plot.cmd("splot 'build/examples/tumour_render_field.csv' using 1:2:3 with pm3d");
+plot.close();
+end _dsl_
+savedsl(v,"build/visual/tumour_ground.dslb");
+r = system ${dsl_cli(v)} --dsl build/visual/tumour_ground.dslb;
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+
+# Geometry: one icosphere (42 vertices, 80 faces) per cell, 1 scene unit = 100 um.
+fn norm(p) { let l = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]); return [p[0] / l, p[1] / l, p[2] / l]; }
+G = (1.0 + sqrt(5.0)) / 2.0;
+V = [[-1.0, G, 0.0], [1.0, G, 0.0], [-1.0, 0.0 - G, 0.0], [1.0, 0.0 - G, 0.0], [0.0, -1.0, G], [0.0, 1.0, G], [0.0, -1.0, 0.0 - G], [0.0, 1.0, 0.0 - G], [G, 0.0, -1.0], [G, 0.0, 1.0], [0.0 - G, 0.0, -1.0], [0.0 - G, 0.0, 1.0]];
+F = [[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+UV = [];
+for (p in V) { push(UV, norm(p)); }
+F2 = [];
+mids = {};
+fn mid(a, b) {
+  let key = a < b ? str(a) + "_" + str(b) : str(b) + "_" + str(a);
+  if (mids.has(key)) { return mids[key]; }
+  let p = norm([(UV[a][0] + UV[b][0]) / 2.0, (UV[a][1] + UV[b][1]) / 2.0, (UV[a][2] + UV[b][2]) / 2.0]);
+  push(UV, p);
+  mids[key] = UV.len() - 1;
+  return UV.len() - 1;
+}
+for (f in F) {
+  let a = mid(f[0], f[1]); let b = mid(f[1], f[2]); let c = mid(f[2], f[0]);
+  push(F2, [f[0], a, c]); push(F2, [f[1], b, a]); push(F2, [f[2], c, b]); push(F2, [a, b, c]);
+}
+RAD = 0.035;
+rows = split(trim(read_file("build/examples/tumour_render_cells.csv")), "\n");
+obj = ["mtllib tumour_cells.mtl"];
+faces_live = [];
+faces_dead = [];
+base = 0;
+nlive = 0;
+for (row in rows) {
+  let c = split(row, ",");
+  let x = num(c[0]) / 100.0; let y = num(c[1]) / 100.0; let alive = num(c[3]);
+  let rr = alive > 0.5 ? RAD : RAD * 0.8;
+  for (p in UV) { push(obj, sprintf("v %.5f %.5f %.5f", x + rr * p[0], y + rr * p[1], rr + rr * p[2])); }
+  let target = alive > 0.5 ? faces_live : faces_dead;
+  for (f in F2) { push(target, sprintf("f %d %d %d", base + f[0] + 1, base + f[1] + 1, base + f[2] + 1)); }
+  base = base + UV.len();
+  if (alive > 0.5) { nlive = nlive + 1; }
+}
+push(obj, "usemtl live");
+for (f in faces_live) { push(obj, f); }
+push(obj, "usemtl apoptotic");
+for (f in faces_dead) { push(obj, f); }
+write_file("build/visual/tumour_cells.obj", join(obj, "\n") + "\n");
+write_file("build/visual/tumour_cells.mtl", "newmtl live\nKd 0.95 0.36 0.04\nNs 60\nnewmtl apoptotic\nKd 0.07 0.07 0.08\nNs 20\n");
+write_file("build/visual/tumour_ground.obj", "v -2.9 -2.9 0\nv 2.9 -2.9 0\nv 2.9 2.9 0\nv -2.9 2.9 0\nvt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\nf 1/1 2/2 3/3\nf 1/1 3/3 4/4\n");
+println(sprintf("%d cells (%d live) -> %d triangles", rows.len(), nlive, rows.len() * F2.len()));
+
+mkdir("images");
+b = _dsl_ cli="lmblender" install="github:lmctl-ai/lmblender@latest";
+let cells = scene.import_obj("build/visual/tumour_cells.obj");
+cells.set_smooth(true);
+let ground = scene.import_obj("build/visual/tumour_ground.obj");
+ground.set_material(scene.image_material("build/visual/tumour_ground.png", 0.8));
+scene.world_color(1.0, 1.0, 1.0, 0.45);
+scene.set_view_transform("AgX");
+scene.area_light(-3.0, -4.0, 6.0, 0.0, 0.0, 0.0, 1.0, 0.95, 0.88, 700.0, 4.0);
+scene.area_light(4.0, 2.0, 4.0, 0.0, 0.0, 0.0, 0.7, 0.8, 1.0, 200.0, 4.0);
+scene.camera_look_at(0.0, -4.1, 2.9, 0.0, -0.1, 0.0, 38.0);
+scene.render_settings(6, 7, true);
+scene.render_png("build/visual/tumour_render_full.png", 24, 900, 520);
+end _dsl_
+savedsl(b, "build/visual/tumour_render.dslb");
+argv = dsl_cli(b);
+push(argv, "--dsl");
+push(argv, "build/visual/tumour_render.dslb");
+r = system(argv, 600000);
+if (r.code!=0) { println(r.stdout); println(r.stderr); }
+assert(r.code==0);
+# A 256-colour palette keeps the gallery PNG small; without ffmpeg the full render is used.
+q = system ffmpeg -y -v error -i build/visual/tumour_render_full.png -vf "split[a][b];[a]palettegen=max_colors=256[p];[b][p]paletteuse=dither=sierra2_4a" -pix_fmt pal8 images/tumour_render.png;
+if (q.code != 0) { copy_file("build/visual/tumour_render_full.png", "images/tumour_render.png"); }
+println("wrote images/tumour_render.png");
