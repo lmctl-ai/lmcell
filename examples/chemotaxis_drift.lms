@@ -84,5 +84,8 @@ r = system ${dsl_cli(v)} --dsl build/visual/chemotaxis_drift.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/chemotaxis_drift.png");
+if (which("ffmpeg") != null) {
 f = system ffmpeg -y -v error -framerate 8 -i build/visual/chemotaxis_drift-frame-%d.png -vf "scale=600:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse" -loop 0 images/chemotaxis_drift.gif;
 if (f.code==0) { println("wrote images/chemotaxis_drift.gif"); } else { println("ffmpeg unavailable: frames are in build/visual/"); }
+
+} else { println("Animation skipped: ffmpeg unavailable; frames are in build/visual/"); }

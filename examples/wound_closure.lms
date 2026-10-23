@@ -82,5 +82,8 @@ r = system ${dsl_cli(v)} --dsl build/visual/wound_closure.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/wound_closure.png");
+if (which("ffmpeg") != null) {
 f = system ffmpeg -y -v error -framerate 5 -i build/visual/wound_closure-frame-%d.png -vf "scale=560:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=32[p];[b][p]paletteuse" -loop 0 images/wound_closure.gif;
 if (f.code==0) { println("wrote images/wound_closure.gif"); } else { println("ffmpeg unavailable: frames are in build/visual/"); }
+
+} else { println("Animation skipped: ffmpeg unavailable; frames are in build/visual/"); }
