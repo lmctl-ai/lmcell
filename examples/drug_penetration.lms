@@ -90,5 +90,8 @@ r = system ${dsl_cli(v)} --dsl build/visual/drug_penetration.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/drug_penetration.png");
+if (which("ffmpeg") != null) {
 f = system ffmpeg -y -v error -framerate 6 -i build/visual/drug_penetration-frame-%d.png -vf "scale=600:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse" -loop 0 images/drug_penetration.gif;
 if (f.code==0) { println("wrote images/drug_penetration.gif"); } else { println("ffmpeg unavailable: frames are in build/visual/"); }
+
+} else { println("Animation skipped: ffmpeg unavailable; frames are in build/visual/"); }

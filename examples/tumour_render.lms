@@ -108,6 +108,11 @@ r = system(argv, 600000);
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 # A 256-colour palette keeps the gallery PNG small; without ffmpeg the full render is used.
+if (which("ffmpeg") != null) {
 q = system ffmpeg -y -v error -i build/visual/tumour_render_full.png -vf "split[a][b];[a]palettegen=max_colors=256[p];[b][p]paletteuse=dither=sierra2_4a" -pix_fmt pal8 images/tumour_render.png;
 if (q.code != 0) { copy_file("build/visual/tumour_render_full.png", "images/tumour_render.png"); }
+} else {
+  copy_file("build/visual/tumour_render_full.png", "images/tumour_render.png");
+  println("Palette reduction skipped: ffmpeg unavailable; full render copied.");
+}
 println("wrote images/tumour_render.png");
