@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "memory_budget.hpp"
 #include "BioFVM.h"
 #include "PhysiCell.h"
 #include <algorithm>
@@ -11,6 +12,12 @@
 namespace lmcell {
 namespace {
 bool used = false;
+// Budget pre-checks (memory_budget.hpp), measured on x86_64 Linux: a 2D BioFVM grid with its
+// cell container and LOD solver scratch peaks at about 680 + 94 * substrates bytes per voxel;
+// one PhysiCell cell with its phenotype takes about 4.6 KiB. Checking before PhysiCell builds
+// them keeps a budget failure out of half-initialized global state.
+constexpr std::size_t kVoxelBytes = 768, kVoxelSubstrateBytes = 96;
+constexpr std::size_t kCellBytes = 16 * 1024;
 void finite(double x, const char *n) {
   if (!std::isfinite(x))
     throw std::invalid_argument(std::string(n) + " must be finite");
@@ -133,6 +140,9 @@ Results run(const Config &cfg) {
     std::streambuf *old = std::cout.rdbuf(std::cerr.rdbuf());
     ~CoutToCerr() { std::cout.rdbuf(old); }
   } quiet_stdout;
+  membudget::require(static_cast<std::size_t>(nx * ny) *
+                     (kVoxelBytes + kVoxelSubstrateBytes *
+                                        std::max<std::size_t>(1, cfg.substrates.size())));
   microenvironment.name = "lmcell";
   set_default_microenvironment(&microenvironment);
   default_microenvironment_options.simulate_2D = true;
@@ -243,6 +253,7 @@ Results run(const Config &cfg) {
     c->is_active = true;
   };
   for (const auto &p : cfg.seeds) {
+    membudget::require(kCellBytes);
     auto *c = create_cell(*defs[static_cast<size_t>(p[2])]);
     c->assign_position(p[0], p[1], 0);
     const auto t =
@@ -311,6 +322,7 @@ Results run(const Config &cfg) {
         if (all_cells->size() >= 100000)
           throw std::runtime_error("cell population limit exceeded");
         ph.flagged_for_division = false;
+        membudget::require(kCellBytes);
         auto *child = create_cell(*defs[ti]);
         child->phenotype = ph;
         child->assign_position(c->position);

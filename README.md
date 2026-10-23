@@ -98,6 +98,13 @@ Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lm
 
 Tests compare populations with exponential birth/death laws, Hill-modulated death, persistent-walk MSD and isotropy, diffusion-decay steady penetration, and volume-normalized uptake. Nine native scenarios and eight DSL programs also check validation, partial duration, matrices, multiple substrates and deterministic exports. `test.sh` checks pins, schema/compiler/registry parity, notices, static linking, usage/error codes and dry runs. [Durable memory](durable-memory/index.md) records numerical details and release evidence.
 
+## Resource limits
+
+A program may use at most 4096 MiB in total (cells, voxel grids, recorded results, everything the
+host keeps); beyond that it stops with a run error (exit 3) naming the limit, instead of
+exhausting the machine. Set `LMCELL_MAX_MEMORY_MB` to change it, e.g.
+`LMCELL_MAX_MEMORY_MB=16384 lmscript tissue.lms`.
+
 ## License
 
 The host is [MIT](LICENSE). PhysiCell and BioFVM are BSD-3-Clause; bundled pugixml and the scripting SDK are MIT. Their notices are embedded in `lmcell --notices` and included in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES). MaBoSS, PhysiBoSS, RoadRunner and GPL/LGPL dependencies are excluded. CMake creates a build-only BioFVM copy that removes premature global-options writes, and the wrapper explicitly binds substrate storage and initializes a field omitted by an upstream copy constructor; the pinned checkout stays unmodified. See [license and integration decisions](durable-memory/02-libraries-and-licenses.md).

@@ -80,7 +80,7 @@ target_include_directories(physicell_core SYSTEM PUBLIC cpp/serial)
 # Upstream warnings are noisy; sanitizer flags still instrument this target.
 target_compile_options(physicell_core PRIVATE -w)
 
-add_library(cell_core STATIC cpp/core.cpp)
+add_library(cell_core STATIC cpp/core.cpp cpp/memory_budget.cpp)
 target_include_directories(cell_core PUBLIC cpp ${PHYS}/core ${PHYS}/modules ${PHYS}/BioFVM)
 target_include_directories(cell_core SYSTEM PUBLIC cpp/serial)
 target_link_libraries(cell_core PUBLIC physicell_core)
