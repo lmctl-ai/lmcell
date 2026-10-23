@@ -8,7 +8,7 @@ Matrix CSV contains no header: counts time/live; cells x/y/type/alive; profiles 
 
 DSL has no lists/maps/callbacks. Scalar helper expressions accept arithmetic, powers and elementary functions in strings; DSL literals use ordinary decimal spelling. User conditions use cell.assert_true; scalar comparisons use cell.assert_close with an absolute tolerance. Dry run never invokes run or file writers.
 
-## Additions (2026-10-23, v0.2.0)
+## Additions (2026-10-23, v0.1.2)
 
 - `Sim.edge(substrate, side, value)`: per-side Dirichlet override (`xmin|xmax|ymin|ymax`, -1 = no flux). Global `boundary` applies first, then edges in call order (last wins at corners). Single-row domains reject y sides.
 - `Sim.diffusion_dt(dt)`: exchange + diffusion substeps of `step/ceil(step/dt)` inside each cell step (PhysiCell's diffusion_dt). Uptake constants are recomputed with the substep. The grid-step budget counts substeps.

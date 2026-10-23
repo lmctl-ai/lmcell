@@ -16,4 +16,4 @@ Each command ran with `timeout 300` in a separate initially empty directory, wit
 
 README gallery (2026-10-23) is grouped: Tumours and therapy, Tissue and migration, Rules and signals, Checked against closed forms. Cards use `<img width=290>` with a one-line result and the autorun command. check-gallery.py requires every example in the README, a visual-host binding, images/<stem>.png, and PNG width 850-1000, <= 300 KB; GIF <= 3 MB.
 
-Raw-URL autorun of the eight new examples needs a lmcell release containing the v0.2.0 API (install=@latest); until then they fail with "type Sim has no method ...". CMakeLists is at 0.2.0 for that release.
+Raw-URL autorun of the eight new examples needs a lmcell release containing the v0.1.2 API (install=@latest); until then they fail with "type Sim has no method ...". CMakeLists is at 0.1.2 for that release.
