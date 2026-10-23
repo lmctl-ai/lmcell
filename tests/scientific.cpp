@@ -1,3 +1,4 @@
+#include "PhysiCell.h"
 #include "core.hpp"
 #include <cmath>
 #include <iostream>
@@ -137,6 +138,7 @@ int main(int argc, char **argv) {
       near(r.profiles.at(10, 2), std::exp(-1.0), .0015,
            "semi-infinite exponential penetration");
     } else if (mode == "exchange") {
+      PhysiCell::cell_defaults.phenotype.secretion.pMicroenvironment = nullptr;
       c.xmin = 0;
       c.xmax = 10;
       c.ymin = 0;
