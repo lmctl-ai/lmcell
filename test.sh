@@ -49,7 +49,7 @@ diff -u <("$LMSCRIPT" --dsl-signatures schema/lmcell.dsl.json) <("$HOST" --dsl-s
 ok "host registry matches compiler signatures"
 "$HOST" --notices >"$WORK/notices.txt" || fail "--notices"
 cmp -s "$WORK/notices.txt" THIRD_PARTY_NOTICES || fail "--notices differs from THIRD_PARTY_NOTICES"
-for want in PhysiCell BioFVM pugixml cpp-dsl-sdk; do grep -q "$want" "$WORK/notices.txt" || fail "--notices lacks $want"; done
+for want in PhysiCell BioFVM pugixml lmcode-cpp; do grep -q "$want" "$WORK/notices.txt" || fail "--notices lacks $want"; done
 ok "--notices prints THIRD_PARTY_NOTICES byte for byte"
 
 case "$UNAME_S" in

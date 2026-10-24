@@ -18,7 +18,7 @@ This keeps the release statically linkable on Linux, macOS, and MinGW while
 making single-thread deterministic runs explicit. The source tree is fetched
 at build time by `scripts/sync-deps.sh` and is never committed.
 
-The host itself is MIT licensed. The pinned header-only cpp-dsl-sdk is MIT.
+The host itself is MIT licensed. The pinned header-only lmcode-cpp is MIT.
 `THIRD_PARTY_NOTICES` embeds the required redistribution notices in the
 binary and `lmcell --notices` prints them.
 
