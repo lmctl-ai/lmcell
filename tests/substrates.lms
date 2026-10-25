@@ -1,9 +1,9 @@
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(1).domain(0.0,10.0,0.0,10.0,5.0);
 s.substrate("A",1.0,0.1,1.0,-1.0).substrate("B",2.0,0.2,2.0,-1.0);
 let r=s.run(1.0,0.01);
 cell.assert_true(r.profiles().cols()==4);
 cell.assert_close(r.profiles().get(0,2),cell.eval("exp(-0.1)"),0.0001);
 cell.assert_close(r.profiles().get(0,3),cell.eval("2*exp(-0.2)"),0.0002);
-end _dsl_
+end _lmcode_
 savedsl(p, "build/substrates.dslb");

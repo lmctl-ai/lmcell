@@ -7,7 +7,7 @@
 # Writes images/contact_inhibition.png.
 mkdir("build/examples");
 fn run_case(name, rule) {
-  p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+  p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
   let s=cell.sim(77).domain(0.0,200.0,0.0,200.0,20.0);
   let t=s.cell_type("epithelial").radius(5.0).cycle(0.02).death(0.004).motility(0.5,5.0);
   let K=float(${rule});
@@ -23,7 +23,7 @@ fn run_case(name, rule) {
     cell.assert_close(m/n/100.0,1.0+2.0*K,0.12*(1.0+2.0*K));
   }
   r.counts().save_csv(${"build/examples/contact_" + name + ".csv"});
-end _dsl_
+end _lmcode_
   savedsl(p, "build/contact_inhibition.dslb");
   r = system ${dsl_cli(p)} --dsl build/contact_inhibition.dslb;
   if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -35,7 +35,7 @@ run_case("k8", 8);
 run_case("free", 0);
 
 mkdir("images");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/contact_inhibition.png",900,500);
 plot.cmd("set datafile separator ','");
 plot.cmd("set tics nomirror out; set border 3; set grid back lc rgb '#e4e9ef'");
@@ -58,7 +58,7 @@ plot.cmd("set label 2 'N - 1 = 2K' at 10.6,0.0075 left tc rgb '#5864a8' font ',1
 plot.cmd("plot 0.02*(1-x**2/(25+x**2)) with lines lc rgb '#5864a8' lw 2.5 title 'division', 0.004 with lines lc rgb '#333333' lw 2 title 'death'");
 plot.cmd("unset multiplot");
 plot.close();
-end _dsl_
+end _lmcode_
 savedsl(v,"build/contact_inhibition_plot.dslb");
 r = system ${dsl_cli(v)} --dsl build/contact_inhibition_plot.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }

@@ -10,7 +10,7 @@
 # Writes images/wound_closure.png (and images/wound_closure.gif when ffmpeg is present).
 mkdir("build/examples");
 fn assay(name, grow) {
-  p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+  p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
   let s=cell.sim(2024).domain(0.0,600.0,0.0,200.0,20.0);
   let t=s.cell_type("keratinocyte").radius(5.0).motility(0.5,10.0);
   if (${grow} == 1) { t.cycle(0.02).death(0.004).rule_toward("neighbors","cycle entry",0.0,3.0,2.0); }
@@ -21,7 +21,7 @@ fn assay(name, grow) {
   for (i in range(0,c.rows())) { if (c.get(i,3)==1.0 && c.get(i,0)>200.0 && c.get(i,0)<400.0) { inside=inside+1.0; } }
   if (${grow} == 1) { cell.assert_true(inside/700.0 > 0.75); } else { cell.assert_true(inside/700.0 < 0.6); }
   r.history().save_csv(${"build/examples/wound_" + name + ".csv"});
-end _dsl_
+end _lmcode_
   savedsl(p, "build/wound_closure.dslb");
   r = system ${dsl_cli(p)} --dsl build/wound_closure.dslb;
   if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -32,7 +32,7 @@ assay("grow", 1);
 
 mkdir("build/visual");
 mkdir("images");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/wound_closure.png",900,640);
 plot.cmd("set datafile separator ','");
 plot.cmd("set tics nomirror out; set border 3");
@@ -76,7 +76,7 @@ for (k in range(0,25)) {
   plot.cmd("plot 'build/examples/wound_grow.csv' using ($1==t0&&$5==1?$2:NaN):3 with points pt 7 ps 0.3 lc rgb '#df6b38' notitle");
   plot.close();
 }
-end _dsl_
+end _lmcode_
 savedsl(v,"build/visual/wound_closure.dslb");
 r = system ${dsl_cli(v)} --dsl build/visual/wound_closure.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }

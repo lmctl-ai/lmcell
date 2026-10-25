@@ -1,14 +1,14 @@
 mkdir("build/examples");
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(54321);s.cell_type("walker").motility(1.0,1.0).radius(1.0);let r=s.seed("walker",3000,0.0,0.0).run(20.0,0.05);cell.assert_true(r.live()==3000);r.cells().save_csv("build/examples/persistent_swarm.csv");
-end _dsl_
+end _lmcode_
 savedsl(p, "build/persistent_swarm.dslb");
 r = system ${dsl_cli(p)} --dsl build/persistent_swarm.dslb;
 assert(r.code == 0);
 
 mkdir("build/visual");
 mkdir("images");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/persistent_swarm.png",900,520);
 plot.cmd("set datafile separator ','");
 plot.cmd("set border 3");
@@ -29,7 +29,7 @@ plot.cmd("set yrange [-22:22]");
 plot.cmd("unset key");
 plot.cmd("plot 'build/examples/persistent_swarm.csv' using 1:2 with points pt 7 ps 0.3 lc rgb '#007f86'");
 plot.close();
-end _dsl_
+end _lmcode_
 savedsl(v,"build/visual/persistent_swarm.dslb");
 r = system ${dsl_cli(v)} --dsl build/visual/persistent_swarm.dslb;
 assert(r.code==0);

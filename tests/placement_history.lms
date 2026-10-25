@@ -1,4 +1,4 @@
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(9).domain(0.0,200.0,0.0,100.0,10.0);
 s.substrate("food",0.0,0.0,1.0,-1.0).substrate("signal",0.0,0.0,0.0,-1.0);
 s.substrate("cue",20.0,0.0,0.0,-1.0).edge("cue","xmin",0.0).edge("cue","xmax",1.0);
@@ -16,5 +16,5 @@ cell.assert_close(r.history().get(5*85-1,0),4.0,0.0);
 cell.assert_true(r.cells().get(0,0)>=0.0 && r.cells().get(0,0)<100.0);
 cell.assert_true(r.cells().get(50,0)>=144.0 && r.cells().get(50,0)<=156.0);
 cell.assert_true(r.cells().get(84,0)==100.0);
-end _dsl_
+end _lmcode_
 savedsl(p, "build/placement_history.dslb");

@@ -5,7 +5,7 @@
 # Cells are point agents in lmcell, so they are drawn at 3.5 um radius to keep them apart.
 # Writes images/tumour_render.png (palette-reduced with ffmpeg when available).
 mkdir("build/examples");
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(424242).domain(-300.0,300.0,-300.0,300.0,20.0);
 s.substrate("nutrient",3000.0,0.0,1.0,1.0);
 let t=s.cell_type("tumour").radius(8.0).exchange("nutrient",0.5,0.0).death(0.004);
@@ -16,7 +16,7 @@ let r=s.run(360.0,0.1);
 cell.assert_true(r.live() > 1500 && r.cells().rows() > r.live() + 400);
 r.cells().save_csv("build/examples/tumour_render_cells.csv");
 r.profiles().save_csv("build/examples/tumour_render_field.csv");
-end _dsl_
+end _lmcode_
 savedsl(p, "build/tumour_render.dslb");
 r = system ${dsl_cli(p)} --dsl build/tumour_render.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -24,7 +24,7 @@ assert(r.code==0);
 
 # Ground texture: the nutrient field, edge to edge, no axes.
 mkdir("build/visual");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("build/visual/tumour_ground.png",600,600);
 plot.cmd("set datafile separator ','");
 plot.cmd("set lmargin at screen 0; set rmargin at screen 1; set tmargin at screen 1; set bmargin at screen 0; unset border; unset tics; unset key; unset colorbox");
@@ -33,7 +33,7 @@ plot.cmd("set palette defined (0 '#f6f2ea', 0.5 '#a9c0dc', 1 '#34558a'); set cbr
 plot.cmd("set view map; set pm3d map interpolate 4,4; set dgrid3d 30,30 splines");
 plot.cmd("splot 'build/examples/tumour_render_field.csv' using 1:2:3 with pm3d");
 plot.close();
-end _dsl_
+end _lmcode_
 savedsl(v,"build/visual/tumour_ground.dslb");
 r = system ${dsl_cli(v)} --dsl build/visual/tumour_ground.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -87,7 +87,7 @@ write_file("build/visual/tumour_ground.obj", "v -2.9 -2.9 0\nv 2.9 -2.9 0\nv 2.9
 println(sprintf("%d cells (%d live) -> %d triangles", rows.len(), nlive, rows.len() * F2.len()));
 
 mkdir("images");
-b = _dsl_ cli="lmblender" install="github:lmctl-ai/lmblender@latest";
+b = _lmcode_ cli="lmblender" install="github:lmctl-ai/lmblender@latest";
 let cells = scene.import_obj("build/visual/tumour_cells.obj");
 cells.set_smooth(true);
 let ground = scene.import_obj("build/visual/tumour_ground.obj");
@@ -99,7 +99,7 @@ scene.area_light(4.0, 2.0, 4.0, 0.0, 0.0, 0.0, 0.7, 0.8, 1.0, 200.0, 4.0);
 scene.camera_look_at(0.0, -4.1, 2.9, 0.0, -0.1, 0.0, 38.0);
 scene.render_settings(6, 7, true);
 scene.render_png("build/visual/tumour_render_full.png", 24, 900, 520);
-end _dsl_
+end _lmcode_
 savedsl(b, "build/visual/tumour_render.dslb");
 argv = dsl_cli(b);
 push(argv, "--dsl");

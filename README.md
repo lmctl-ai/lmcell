@@ -59,7 +59,7 @@ The first run downloads the lmcell and lmplot release binaries for your platform
 ## Write your own
 
 ```lmscript
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s = cell.sim(7).domain(-200.0, 200.0, -200.0, 200.0, 20.0);
 s.substrate("oxygen", 2000.0, 0.0, 1.0, 1.0);            # edges held at 1
 let t = s.cell_type("tumour").radius(8.0).exchange("oxygen", 0.5, 0.0);
@@ -69,7 +69,7 @@ let r = s.seed_disk("tumour", 1000, 0.0, 0.0, 120.0).record(30.0).run(360.0, 0.1
 r.cells().save_csv("cells.csv");          # x, y, type, alive
 r.history().save_csv("history.csv");      # time, x, y, type, alive every 30 min
 r.profiles().save_csv("oxygen.csv");      # x, y, oxygen
-end _dsl_
+end _lmcode_
 savedsl(p, "tissue.dslb");
 system ${dsl_cli(p)} --dsl tissue.dslb;
 ```
@@ -129,7 +129,7 @@ cmake --build build --parallel 4
 ./test.sh
 ```
 
-Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lmctl-ai/lmctl@0.2.369`). OpenMP is disabled through a tiny serial compatibility header. Linux links all scientific libraries and `libstdc++`/`libgcc` statically and uses only dynamic glibc (>= 2.35); macOS uses only system libraries; Windows links MinGW runtimes statically. Dependencies are pinned in `deps.lock` and fetched into ignored `third_party/`.
+Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lmctl-ai/lmctl@0.2.419`). OpenMP is disabled through a tiny serial compatibility header. Linux links all scientific libraries and `libstdc++`/`libgcc` statically and uses only dynamic glibc (>= 2.35); macOS uses only system libraries; Windows links MinGW runtimes statically. Dependencies are pinned in `deps.lock` and fetched into ignored `third_party/`.
 
 Native tests compare against closed forms: exponential birth/death, Hill-modulated rates (including `rule_toward` from a zero base), persistent-walk MSD and isotropy, the cosh penetration profile, a linear profile between fixed edges (with and without diffusion substeps), the 2D Laplace problem on a square (centre = 1/4 and the Fourier series), chemotactic drift v·E[b] (1 and 2/π), the contact-inhibition carrying capacity, and volume-normalized uptake/secretion for one and two substrates. DSL programs and every example also run in `test.sh`, which checks pins, schema/compiler/registry parity, notices, runtime linkage, usage/error codes, dry runs, byte-identical reruns and the gallery. [Durable memory](durable-memory/index.md) records numerical details and release evidence.
 

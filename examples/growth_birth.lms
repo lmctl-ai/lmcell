@@ -1,14 +1,14 @@
 mkdir("build/examples");
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(12345);s.cell_type("growing").cycle(0.3).radius(1.0);let r=s.seed("growing",2000,0.0,0.0).run(2.0,0.01);cell.assert_close(float(r.live()),cell.eval("2000*exp(0.6)"),190.0);r.counts().save_csv("build/examples/growth_birth.csv");
-end _dsl_
+end _lmcode_
 savedsl(p, "build/growth_birth.dslb");
 r = system ${dsl_cli(p)} --dsl build/growth_birth.dslb;
 assert(r.code == 0);
 
 mkdir("build/visual");
 mkdir("images");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/growth_birth.png",900,520);
 plot.cmd("set datafile separator ','");
 plot.cmd("set border 3");
@@ -26,7 +26,7 @@ plot.cmd("set ylabel 'Live cells'");
 plot.cmd("set xrange [0:2]");
 plot.cmd("plot 'build/examples/growth_birth.csv' using 1:2 with lines ls 1 title 'Seeded agents', 2000*exp(0.3*x) with lines ls 2 dt 2 title 'Expected population'");
 plot.close();
-end _dsl_
+end _lmcode_
 savedsl(v,"build/visual/growth_birth.dslb");
 r = system ${dsl_cli(v)} --dsl build/visual/growth_birth.dslb;
 assert(r.code==0);

@@ -1,8 +1,8 @@
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(12345);
 s.cell_type("dying").death(0.3).radius(1.0);
 let r=s.seed("dying",5000,0.0,0.0).run(2.0,0.01);
 cell.assert_close(float(r.live()),cell.eval("5000*exp(-0.6)"),120.0);
 cell.assert_true(r.cells().rows()==5000);
-end _dsl_
+end _lmcode_
 savedsl(p, "build/apoptosis.dslb");

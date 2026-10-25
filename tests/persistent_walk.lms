@@ -1,9 +1,9 @@
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(54321);
 s.cell_type("walker").motility(1.0,1.0).radius(1.0);
 let r=s.seed("walker",2000,0.0,0.0).run(10.0,0.05);
 let m=r.cells();let sum=0.0;
 for(i in range(0,m.rows())) {let x=m.get(i,0);let y=m.get(i,1);sum=sum+x*x+y*y;}
 cell.assert_close(sum/float(m.rows()),18.0,1.8);
-end _dsl_
+end _lmcode_
 savedsl(p, "build/persistent_walk.dslb");

@@ -7,7 +7,7 @@
 # the measured growth rate ln(N/N0)/T must match each formula.
 # Writes images/hill_rules.png (drawn with lmdraw: rule diagram plus measured curves).
 mkdir("build/examples");
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(5150).domain(0.0,100.0,0.0,100.0,100.0);
 # Signal levels 0, 0.25, 0.5, 1, 2, 4.
 for (i in range(0,6)) {
@@ -28,7 +28,7 @@ cell.assert_close(float(r.live_of("dec5")),cell.eval("1000*exp(8*0.10*(1-16/17))
 cell.assert_close(float(r.live_of("tow5")),cell.eval("1000*exp(8*0.12*16/17)"),180.0);
 cell.assert_true(r.live_of("tow0")==1000);
 r.type_counts().save_csv("build/examples/hill_rules_counts.csv");
-end _dsl_
+end _lmcode_
 savedsl(p, "build/hill_rules.dslb");
 r = system ${dsl_cli(p)} --dsl build/hill_rules.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -84,7 +84,7 @@ worst_txt = sprintf("largest deviation %.4f /min (Poisson noise, 1000 cells)", w
 mkdir("build/visual");
 mkdir("build/rendered");
 mkdir("images");
-v = _dsl_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+v = _lmcode_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
 scene.canvas(900, 560, "#ffffff");
 scene.text(40.0, 44.0, 22.0, "One signal, three rule forms: what a Hill rule does to a rate", "#1f2933").set_attr("font-weight", "700");
 scene.text(40.0, 70.0, 13.5, "Lines: the formula. Dots: growth rate measured from 1000 simulated cells per point (ln(N/N0)/T over 8 min).", "#52606d");
@@ -159,7 +159,7 @@ scene.text(700.0, ${fl(gy(0.078))}, 12.0, "increases, r₀ = 0.05", "#b4501f");
 scene.text(700.0, ${fl(gy(0.034))}, 12.0, "decreases, r₀ = 0.10", "#3f4a8a");
 scene.text(690.0, ${fl(gy(0.135))}, 12.0, "toward 0.12 from r₀ = 0", "#006066");
 scene.render_png("build/rendered/hill_rules.png", 900, 560, 1);
-end _dsl_
+end _lmcode_
 savedsl(v,"build/visual/hill_rules.dslb");
 r = system ${dsl_cli(v)} --dsl build/visual/hill_rules.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }

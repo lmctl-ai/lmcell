@@ -7,7 +7,7 @@
 # most cells surviving beyond ~3L, the classic "drug penetration barrier".
 # Writes images/drug_penetration.png (and images/drug_penetration.gif when ffmpeg is present).
 mkdir("build/examples");
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(31337).domain(0.0,600.0,0.0,240.0,30.0);
 s.substrate("drug",2000.0,0.2,0.0,-1.0).edge("drug","xmin",1.0);
 s.cell_type("tumour").radius(8.0).death(0.0005).rule_toward("drug","apoptosis",0.02,0.3,2.0);
@@ -38,7 +38,7 @@ c.save_csv("build/examples/drug_cells.csv");
 f.save_csv("build/examples/drug_field.csv");
 r.history().save_csv("build/examples/drug_history.csv");
 r.profile_history().save_csv("build/examples/drug_field_history.csv");
-end _dsl_
+end _lmcode_
 savedsl(p, "build/drug_penetration.dslb");
 r = system ${dsl_cli(p)} --dsl build/drug_penetration.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -46,7 +46,7 @@ assert(r.code==0);
 
 mkdir("build/visual");
 mkdir("images");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/drug_penetration.png",900,600);
 plot.cmd("set datafile separator ','");
 plot.cmd("set tics nomirror out; set border 3");
@@ -84,7 +84,7 @@ for (k in range(0,25)) {
   plot.cmd("plot 'build/examples/drug_field_history.csv' every ::"+str(k*160)+"::"+str(k*160+159)+" using 2:3:4 with image notitle, 'build/examples/drug_history.csv' using ($1==t0&&$5==1?$2:NaN):3 with points pt 7 ps 0.6 lc rgb '#0b8f8f' notitle, '' using ($1==t0&&$5==0?$2:NaN):3 with points pt 6 ps 0.6 lc rgb '#555555' notitle");
   plot.close();
 }
-end _dsl_
+end _lmcode_
 savedsl(v,"build/visual/drug_penetration.dslb");
 r = system ${dsl_cli(v)} --dsl build/visual/drug_penetration.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }

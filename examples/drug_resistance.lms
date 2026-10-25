@@ -10,7 +10,7 @@
 # Writes images/drug_resistance.png.
 mkdir("build/examples");
 fn therapy(name, dose) {
-  p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+  p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
   let s=cell.sim(99).domain(0.0,100.0,0.0,100.0,100.0);
   s.substrate("drug",0.0,0.0,float(${dose}),-1.0);
   s.cell_type("sensitive").radius(5.0).cycle(0.0010).death(0.0001).rule_toward("drug","apoptosis",0.0050,0.2,2.0);
@@ -20,7 +20,7 @@ fn therapy(name, dose) {
   # Resistant clone: 100 e^(0.0006*2400); birth-death noise sd = sqrt(n0 (b+d)/(b-d) e^(rt) (e^(rt)-1)) ~ 47.
   cell.assert_close(float(r.live_of("resistant")),cell.eval("100*exp(0.0006*2400)"),190.0);
   r.type_counts().save_csv(${"build/examples/resistance_" + name + ".csv"});
-end _dsl_
+end _lmcode_
   savedsl(p, "build/drug_resistance.dslb");
   r = system ${dsl_cli(p)} --dsl build/drug_resistance.dslb;
   if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -30,7 +30,7 @@ therapy("holiday", 0);
 therapy("drug", 1);
 
 mkdir("images");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/drug_resistance.png",900,500);
 plot.cmd("set datafile separator ','");
 plot.cmd("set tics nomirror out; set border 3; set grid back lc rgb '#e4e9ef'");
@@ -51,7 +51,7 @@ plot.cmd("set key at graph 0.98, graph 0.55 right top samplen 2 font ',10' nobox
 plot.cmd("plot 'build/examples/resistance_drug.csv' using ($1/60):($3/($2+$3)) with lines lc rgb '#df6b38' lw 3 title 'on drug', f(60*x,gr-gs) with lines lc rgb '#7a2a08' dt 2 lw 1.5 title 'logistic, s = +0.0044', 'build/examples/resistance_holiday.csv' using ($1/60):($3/($2+$3)) with lines lc rgb '#007f86' lw 3 title 'drug holiday', f(60*x,-0.0003) with lines lc rgb '#003c40' dt 2 lw 1.5 title 'logistic, s = -0.0003'");
 plot.cmd("unset multiplot");
 plot.close();
-end _dsl_
+end _lmcode_
 savedsl(v,"build/drug_resistance_plot.dslb");
 r = system ${dsl_cli(v)} --dsl build/drug_resistance_plot.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }

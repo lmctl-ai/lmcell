@@ -6,7 +6,7 @@
 # v * E[(b + (1-b)cos t) / |b e + (1-b) u|] = 0, 2v/pi and v respectively.
 # Writes images/chemotaxis_drift.png (and images/chemotaxis_drift.gif when ffmpeg is present).
 mkdir("build/examples");
-p = _dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
+p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(2026).domain(0.0,1000.0,0.0,600.0,20.0);
 s.substrate("chemokine",10000.0,0.0,0.0,-1.0).edge("chemokine","xmin",0.0).edge("chemokine","xmax",1.0);
 s.cell_type("unbiased").radius(5.0).motility(1.5,2.0).chemotaxis("chemokine",0.0);
@@ -29,7 +29,7 @@ cell.assert_close((b1-a1)/180.0,cell.eval("1.5*2/pi"),0.06);
 cell.assert_close((b2-a2)/180.0,1.5,0.06);
 h.save_csv("build/examples/chemotaxis_history.csv");
 r.profiles().save_csv("build/examples/chemotaxis_field.csv");
-end _dsl_
+end _lmcode_
 savedsl(p, "build/chemotaxis_drift.dslb");
 r = system ${dsl_cli(p)} --dsl build/chemotaxis_drift.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
@@ -37,7 +37,7 @@ assert(r.code==0);
 
 mkdir("build/visual");
 mkdir("images");
-v = _dsl_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
 plot.png("images/chemotaxis_drift.png",900,470);
 plot.cmd("set datafile separator ','");
 plot.cmd("set style line 1 lc rgb '#8a8f98' lw 3");
@@ -78,7 +78,7 @@ for (k in range(0,41)) {
   plot.cmd("plot 'build/examples/chemotaxis_field.csv' using 1:2:3 with image notitle, 'build/examples/chemotaxis_history.csv' using ($1==t0?$2:NaN):3:($4==0?0x8a8f98:($4==1?0x5864a8:0xdf6b38)) with points pt 7 ps 0.55 lc rgb variable notitle");
   plot.close();
 }
-end _dsl_
+end _lmcode_
 savedsl(v,"build/visual/chemotaxis_drift.dslb");
 r = system ${dsl_cli(v)} --dsl build/visual/chemotaxis_drift.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
