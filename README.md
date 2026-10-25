@@ -129,7 +129,7 @@ cmake --build build --parallel 4
 ./test.sh
 ```
 
-Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lmctl-ai/lmctl@0.2.419`). OpenMP is disabled through a tiny serial compatibility header. Linux links all scientific libraries and `libstdc++`/`libgcc` statically and uses only dynamic glibc (>= 2.35); macOS uses only system libraries; Windows links MinGW runtimes statically. Dependencies are pinned in `deps.lock` and fetched into ignored `third_party/`.
+Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lmctl-ai/lmctl@0.2.420`). OpenMP is disabled through a tiny serial compatibility header. Linux links all scientific libraries and `libstdc++`/`libgcc` statically and uses only dynamic glibc (>= 2.35); macOS uses only system libraries; Windows links MinGW runtimes statically. Dependencies are pinned in `deps.lock` and fetched into ignored `third_party/`.
 
 Native tests compare against closed forms: exponential birth/death, Hill-modulated rates (including `rule_toward` from a zero base), persistent-walk MSD and isotropy, the cosh penetration profile, a linear profile between fixed edges (with and without diffusion substeps), the 2D Laplace problem on a square (centre = 1/4 and the Fourier series), chemotactic drift v·E[b] (1 and 2/π), the contact-inhibition carrying capacity, and volume-normalized uptake/secretion for one and two substrates. DSL programs and every example also run in `test.sh`, which checks pins, schema/compiler/registry parity, notices, runtime linkage, usage/error codes, dry runs, byte-identical reruns and the gallery. [Durable memory](durable-memory/index.md) records numerical details and release evidence.
 
