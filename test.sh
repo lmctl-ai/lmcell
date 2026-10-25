@@ -45,10 +45,24 @@ ok "schema matches the registrations in cpp/main.cpp"
 "$HOST" --dsl-schema --json >"$WORK/schema.json" || fail "embedded schema print"
 cmp -s "$WORK/schema.json" schema/lmcell.dsl.json || fail "embedded schema differs from schema/lmcell.dsl.json"
 ok "--dsl-schema --json prints byte-identical embedded schema bytes"
-WITHOUT_STD=""
-"$LMSCRIPT" --help 2>&1 | grep -q -- '--without-std' && WITHOUT_STD="--without-std"
-diff -u <("$LMSCRIPT" --dsl-signatures schema/lmcell.dsl.json $WITHOUT_STD) <("$HOST" --dsl-signatures) || fail "host/compiler signatures differ"
-ok "host registry matches compiler signatures"
+"$HOST" --dsl-signatures > "$WORK/host.sig"
+"$LMSCRIPT" --dsl-signatures schema/lmcell.dsl.json > "$WORK/compiler.sig"
+diff -u "$WORK/compiler.sig" "$WORK/host.sig" || fail "host/compiler signatures differ"
+ok "host registry matches compiler signatures ($(wc -l < "$WORK/host.sig" | tr -d ' ') signatures)"
+
+"$HOST" --dsl-signatures >"$WORK/registry-signatures.txt"
+"$LMSCRIPT" --dsl-signatures cpp/std/lmcode-std.schema.json >"$WORK/standard-signatures.txt"
+python3 - "$WORK" <<'PYHOST'
+from pathlib import Path
+import sys
+work=Path(sys.argv[1])
+registry=set((work/'registry-signatures.txt').read_text().splitlines())
+standard=set((work/'standard-signatures.txt').read_text().splitlines())
+assert len(standard)==72, len(standard)
+(work/'host-signatures.txt').write_bytes(''.join(line+'\n' for line in sorted(registry-standard)).encode('utf-8'))
+PYHOST
+diff -u <("$LMSCRIPT" --dsl-signatures schema/lmcell.dsl.json --without-std) "$WORK/host-signatures.txt" || fail "host-only registry/compiler signatures differ"
+ok "host-only schema bytes and --without-std parity retain domain declarations"
 "$HOST" --notices >"$WORK/notices.txt" || fail "--notices"
 cmp -s "$WORK/notices.txt" THIRD_PARTY_NOTICES || fail "--notices differs from THIRD_PARTY_NOTICES"
 for want in PhysiCell BioFVM pugixml lmcode-cpp; do grep -q "$want" "$WORK/notices.txt" || fail "--notices lacks $want"; done
@@ -214,6 +228,32 @@ if [ "$UNAME_S" = Linux ]; then
 else
   ok "memory budget: runaway loop stops at LMCELL_MAX_MEMORY_MB=64 (default-budget run is Linux-only); division growth and grids count"
 fi
+
+# End-to-end implicit standard library test: calls string, math, collections, and file families.
+python3 - "$WORK" schema/lmcell.dsl.json <<'PYSTD'
+import json, pathlib, sys
+work = pathlib.Path(sys.argv[1])
+schema_path = str(pathlib.Path(sys.argv[2]).resolve()).replace('\\', '/')
+dslb_path = str((work / "std-e2e.dslb").resolve()).replace('\\', '/')
+file_path = str((work / "std-data.txt").resolve()).replace('\\', '/')
+
+script = f'''p = _lmcode_ schema={json.dumps(schema_path)};
+let s = str_upper("cell");
+let m = math_abs(-42);
+let items = str_list().add(s);
+items.add("sim");
+file_write({json.dumps(file_path)}, items.at(0) + ":" + items.at(1) + ":" + str(m));
+let read_back = file_read({json.dumps(file_path)});
+cell.print(read_back);
+end _lmcode_
+savedsl(p, {json.dumps(dslb_path)});
+'''
+(work / "std-e2e.lms").write_text(script)
+PYSTD
+"$LMSCRIPT" "$WORK/std-e2e.lms" >"$WORK/std-compile.log" 2>&1 || { cat "$WORK/std-compile.log" >&2; fail "std e2e compile"; }
+std_out="$("$HOST" --dsl "$WORK/std-e2e.dslb")" || fail "std e2e run failed"
+echo "$std_out" | grep -q "^CELL:sim:42$" || fail "std e2e output mismatch: $std_out"
+ok "implicit standard library end-to-end (string, math, collections, file)"
 
 python3 scripts/check-gallery.py --generated
 ok "gallery links, image signatures, dimensions and byte budgets"

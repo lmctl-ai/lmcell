@@ -29,9 +29,10 @@ cmake --build build --parallel 4      # Build binary at build/lmcell
 
 ## SDK pin and sync
 
-The vendored SDK header is pinned via `sdk.lock` pointing to `https://github.com/lmctl-ai/lmcode-cpp`:
+The vendored SDK headers (`cpp/dslvm.hpp`, `cpp/stdlib/*.hpp`, `cpp/std/lmcode-std.schema.json`, `scripts/merge-std.py`) are pinned via `sdk.lock` pointing to `https://github.com/lmctl-ai/lmcode-cpp` (std built-in registered by default):
 ```sh
-scripts/sync-sdk.sh                   # Refetches pinned cpp/dslvm.hpp and verifies sha256
+scripts/sync-sdk.sh                   # Refetches pinned SDK headers and updates sha256 pins
+scripts/sync-sdk.sh --verify          # Verifies vendored headers match sdk.lock
 ```
 
 ## Adding an example or function
