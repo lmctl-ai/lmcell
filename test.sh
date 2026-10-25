@@ -252,7 +252,12 @@ savedsl(p, {json.dumps(dslb_path)});
 PYSTD
 "$LMSCRIPT" "$WORK/std-e2e.lms" >"$WORK/std-compile.log" 2>&1 || { cat "$WORK/std-compile.log" >&2; fail "std e2e compile"; }
 std_out="$("$HOST" --dsl "$WORK/std-e2e.dslb")" || fail "std e2e run failed"
-echo "$std_out" | grep -q "^CELL:sim:42$" || fail "std e2e output mismatch: $std_out"
+python3 - "$std_out" <<'PYRUN' || fail "std e2e output mismatch: $std_out"
+import sys
+actual = sys.argv[1].replace("\r\n", "\n").replace("\r", "\n").splitlines()
+expected = ["CELL:sim:42", '{"ok": true, "result": null}']
+assert actual == expected, actual
+PYRUN
 ok "implicit standard library end-to-end (string, math, collections, file)"
 
 python3 scripts/check-gallery.py --generated
