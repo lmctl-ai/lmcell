@@ -11,38 +11,38 @@ Agent-based cell biology in one command: tumours that starve, wounds that close,
 | Starving tumour: dead core, live rim | The same tumour, path-traced | Drugs stop a few cell layers from the vessel |
 | --- | --- | --- |
 | <img src="docs/images/spheroid_necrosis.png" width="290" alt="Tumour disc over its nutrient field with an apoptotic core, radial profiles and population counts"> | <img src="docs/images/tumour_render.png" width="290" alt="3D render of 2800 cell spheres, orange live and charcoal apoptotic, on a nutrient-coloured ground"> | <img src="docs/images/drug_penetration.png" width="290" alt="Tissue slice with drug diffusing from a vessel and survival versus distance against theory"> |
-| Uptake outruns diffusion: the centre falls to 0.1 nutrient and dies, a ~60 µm rim keeps dividing ([animation](docs/images/spheroid_necrosis.gif))<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/spheroid_necrosis.lms` | lmcell → lmplot ground texture → lmblender Cycles: every cell as a sphere, the dead core sits on the palest ground<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/tumour_render.lms` | Drug falls as cosh with L = √(D/k) = 100 µm; survival follows exp(−T·death(c)) to within noise ([animation](docs/images/drug_penetration.gif))<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/drug_penetration.lms` |
+| Uptake outruns diffusion: the centre falls to 0.1 nutrient and dies, a ~60 µm rim keeps dividing ([animation](docs/images/spheroid_necrosis.gif))<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/spheroid_necrosis.lms` | lmcell → lmplot ground texture → lmblender Cycles: every cell as a sphere, the dead core sits on the palest ground<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/tumour_render.lms` | Drug falls as cosh with L = √(D/k) = 100 µm; survival follows exp(−T·death(c)) to within noise ([animation](docs/images/drug_penetration.gif))<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/drug_penetration.lms` |
 
 | Therapy selects resistance |
 | --- |
 | <img src="docs/images/drug_resistance.png" width="290" alt="Sensitive and resistant clone sizes on drug and resistant fraction on and off drug"> |
-| Each clone grows as e^{(b−d)t}; the resistant fraction follows the logistic law, s = +0.0044/min on drug, −0.0003 on holiday<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/drug_resistance.lms` |
+| Each clone grows as e^{(b−d)t}; the resistant fraction follows the logistic law, s = +0.0044/min on drug, −0.0003 on holiday<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/drug_resistance.lms` |
 
 ### Tissue and migration
 
 | Scratch-wound assay | Contact inhibition sets carrying capacity | Chemotaxis: steering bias sets drift |
 | --- | --- | --- |
 | <img src="docs/images/wound_closure.png" width="290" alt="Two cell sheets closing a 200 micrometre scratch with and without division, plus fill fraction over time"> | <img src="docs/images/contact_inhibition.png" width="290" alt="Cells per voxel plateauing at 1 + 2K for three crowding thresholds, with the birth-death balance"> | <img src="docs/images/chemotaxis_drift.png" width="290" alt="Three populations drifting up a linear chemokine gradient at speeds 0, 2v/pi and v"> |
-| Division refills the scratch in ~12 h; migration alone fills only ~20 % ([animation](docs/images/wound_closure.gif))<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/wound_closure.lms` | Crowding rule on the built-in `neighbors` signal: plateaus land on N* = 1 + K√(r/d − 1) = 7, 11, 17<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/contact_inhibition.lms` | Linear gradient between fixed edges; drift is 0, 2v/π and v for bias 0, ½, 1 ([animation](docs/images/chemotaxis_drift.gif))<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/chemotaxis_drift.lms` |
+| Division refills the scratch in ~12 h; migration alone fills only ~20 % ([animation](docs/images/wound_closure.gif))<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/wound_closure.lms` | Crowding rule on the built-in `neighbors` signal: plateaus land on N* = 1 + K√(r/d − 1) = 7, 11, 17<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/contact_inhibition.lms` | Linear gradient between fixed edges; drift is 0, 2v/π and v for bias 0, ½, 1 ([animation](docs/images/chemotaxis_drift.gif))<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/chemotaxis_drift.lms` |
 
 ### Rules and signals
 
 | Three Hill rule forms, measured | Oxygen feedback halves apoptosis | Secreted signal saturates with load |
 | --- | --- | --- |
 | <img src="docs/images/hill_rules.png" width="290" alt="Rule diagram and division rate versus signal for increases, decreases and toward rules, simulation dots on formula lines"> | <img src="docs/images/oxygen_rules.png" width="290" alt="Live cells falling at half the base death rate under half-maximal oxygen"> | <img src="docs/images/secretion_signal.png" width="290" alt="Signal concentration rising toward saturation with more cells per voxel"> |
-| `increases` caps at 2×, `decreases` switches off, `rule_toward` reaches any rate, even from 0; 18 populations in one run<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/hill_rules.lms` | A decreasing rule at half-max halves the death rate: survival 5000·e^{−0.15t}<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/oxygen_rules.lms` | Volume-weighted secretion relaxes each voxel toward S/(S+U)<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/secretion_signal.lms` |
+| `increases` caps at 2×, `decreases` switches off, `rule_toward` reaches any rate, even from 0; 18 populations in one run<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/hill_rules.lms` | A decreasing rule at half-max halves the death rate: survival 5000·e^{−0.15t}<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/oxygen_rules.lms` | Volume-weighted secretion relaxes each voxel toward S/(S+U)<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/secretion_signal.lms` |
 
 ### Checked against closed forms
 
 | Division: exponential growth | Apoptosis: exponential survival | Persistent random walk |
 | --- | --- | --- |
 | <img src="docs/images/growth_birth.png" width="290" alt="Population growing exponentially and matching 2000 e^{0.3 t}"> | <img src="docs/images/apoptosis_loss.png" width="290" alt="Live cells decaying exponentially and matching the expected survival curve"> | <img src="docs/images/persistent_swarm.png" width="290" alt="3000 cells spreading isotropically from one point after 20 minutes"> |
-| One-phase live cycle at 0.3/min matches N₀e^{rt}<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/growth_birth.lms` | Independent death at 0.3/min gives N₀e^{−dt}<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/apoptosis_loss.lms` | 3000 walkers from one seed spread isotropically; the MSD follows the persistent-walk law<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/persistent_swarm.lms` |
+| One-phase live cycle at 0.3/min matches N₀e^{rt}<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/growth_birth.lms` | Independent death at 0.3/min gives N₀e^{−dt}<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/apoptosis_loss.lms` | 3000 walkers from one seed spread isotropically; the MSD follows the persistent-walk law<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/persistent_swarm.lms` |
 
 | Penetration length | Uptake scales with load | Well-mixed decay |
 | --- | --- | --- |
 | <img src="docs/images/oxygen_penetration.png" width="290" alt="Steady oxygen profile between two fixed edges matching a cosh curve"> | <img src="docs/images/uptake_load.png" width="290" alt="Remaining substrate after 20 minutes falling with cells per voxel, matching the continuum"> | <img src="docs/images/tissue_decay.png" width="290" alt="Uniform substrate decaying identically in every voxel"> |
-| Diffusion with decay between fixed edges reproduces the cosh profile<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/oxygen_penetration.lms` | More cells per voxel deplete a substrate as the continuum law predicts<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/uptake_load.lms` | A uniform field decays as e^{−λt} in every voxel, with no spurious gradients<br>`lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/tissue_decay.lms` |
+| Diffusion with decay between fixed edges reproduces the cosh profile<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/oxygen_penetration.lms` | More cells per voxel deplete a substrate as the continuum law predicts<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/uptake_load.lms` | A uniform field decays as e^{−λt} in every voxel, with no spurious gradients<br>`lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/tissue_decay.lms` |
 
 Every picture is produced by the example under it; [examples/render-all.sh](examples/render-all.sh) regenerates them all.
 
@@ -51,7 +51,7 @@ Every picture is produced by the example under it; [examples/render-all.sh](exam
 ```sh
 npm install -g @lmctl-ai/lmctl
 mkdir try-lmcell && cd try-lmcell
-lmctl autorun https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/contact_inhibition.lms
+lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/contact_inhibition.lms
 ```
 
 The first run downloads the lmcell and lmplot release binaries for your platform (Linux binaries require dynamic glibc >= 2.35, Ubuntu 22.04+); the example checks its numbers against the formula and writes `images/contact_inhibition.png`. Every command above works the same way from an empty folder. Examples that animate also write `images/<name>.gif` when `ffmpeg` is on your PATH; `tumour_render` additionally downloads lmblender.
