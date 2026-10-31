@@ -8,7 +8,7 @@ r.counts().save_csv("build/examples/oxygen_counts.csv");
 r.cells().save_csv("build/examples/oxygen_cells.csv");
 end _lmcode_
 savedsl(p, "build/oxygen_rules.dslb");
-r = system ${dsl_cli(p)} --dsl build/oxygen_rules.dslb;
+r = system ${dsl_cli(p)} --lmcode build/oxygen_rules.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -33,7 +33,7 @@ plot.cmd("plot 'build/examples/oxygen_counts.csv' using 1:2 with lines ls 1 titl
 plot.close();
 end _lmcode_
 savedsl(v,"build/visual/oxygen_rules.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/oxygen_rules.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/oxygen_rules.dslb;
 assert(r.code==0);
 
 println("wrote images/oxygen_rules.png");

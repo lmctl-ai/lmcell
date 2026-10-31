@@ -30,7 +30,7 @@ cell.assert_true(r.live_of("tow0")==1000);
 r.type_counts().save_csv("build/examples/hill_rules_counts.csv");
 end _lmcode_
 savedsl(p, "build/hill_rules.dslb");
-r = system ${dsl_cli(p)} --dsl build/hill_rules.dslb;
+r = system ${dsl_cli(p)} --lmcode build/hill_rules.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -161,7 +161,7 @@ scene.text(690.0, ${fl(gy(0.135))}, 12.0, "toward 0.12 from r₀ = 0", "#006066"
 scene.render_png("build/rendered/hill_rules.png", 900, 560, 1);
 end _lmcode_
 savedsl(v,"build/visual/hill_rules.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/hill_rules.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/hill_rules.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 copy_file("build/rendered/hill_rules.png", "images/hill_rules.png");

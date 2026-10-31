@@ -18,7 +18,7 @@ r.cells().save_csv("build/examples/tumour_render_cells.csv");
 r.profiles().save_csv("build/examples/tumour_render_field.csv");
 end _lmcode_
 savedsl(p, "build/tumour_render.dslb");
-r = system ${dsl_cli(p)} --dsl build/tumour_render.dslb;
+r = system ${dsl_cli(p)} --lmcode build/tumour_render.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -35,7 +35,7 @@ plot.cmd("splot 'build/examples/tumour_render_field.csv' using 1:2:3 with pm3d")
 plot.close();
 end _lmcode_
 savedsl(v,"build/visual/tumour_ground.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/tumour_ground.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/tumour_ground.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -102,7 +102,7 @@ scene.render_png("build/visual/tumour_render_full.png", 24, 900, 520);
 end _lmcode_
 savedsl(b, "build/visual/tumour_render.dslb");
 argv = dsl_cli(b);
-push(argv, "--dsl");
+push(argv, "--lmcode");
 push(argv, "build/visual/tumour_render.dslb");
 r = system(argv, 600000);
 if (r.code!=0) { println(r.stdout); println(r.stderr); }

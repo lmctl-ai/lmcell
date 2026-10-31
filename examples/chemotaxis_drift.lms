@@ -31,7 +31,7 @@ h.save_csv("build/examples/chemotaxis_history.csv");
 r.profiles().save_csv("build/examples/chemotaxis_field.csv");
 end _lmcode_
 savedsl(p, "build/chemotaxis_drift.dslb");
-r = system ${dsl_cli(p)} --dsl build/chemotaxis_drift.dslb;
+r = system ${dsl_cli(p)} --lmcode build/chemotaxis_drift.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -80,7 +80,7 @@ for (k in range(0,41)) {
 }
 end _lmcode_
 savedsl(v,"build/visual/chemotaxis_drift.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/chemotaxis_drift.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/chemotaxis_drift.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/chemotaxis_drift.png");

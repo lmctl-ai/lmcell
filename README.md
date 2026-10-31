@@ -71,10 +71,10 @@ r.history().save_csv("history.csv");      # time, x, y, type, alive every 30 min
 r.profiles().save_csv("oxygen.csv");      # x, y, oxygen
 end _lmcode_
 savedsl(p, "tissue.dslb");
-system ${dsl_cli(p)} --dsl tissue.dslb;
+system ${dsl_cli(p)} --lmcode tissue.dslb;
 ```
 
-The host accepts only `--dsl FILE...`, `--dry-run --dsl FILE...`, `--version`, `--notices`, `--dsl-schema [--json]` and `--dsl-signatures`. Dry run verifies bytecode without running or writing outputs. Usage errors exit 2; load and run errors exit 3.
+The host accepts only `--lmcode FILE...`, `--dry-run --lmcode FILE...`, `--version`, `--notices`, `--lmcode-schema [--json]` and `--lmcode-signatures`. Dry run verifies bytecode without running or writing outputs. Usage errors exit 2; load and run errors exit 3.
 
 | API | Purpose |
 | --- | --- |

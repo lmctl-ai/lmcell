@@ -30,6 +30,7 @@ if [ ! -f "$BUILD_DIR/CMakeCache.txt" ] && command -v ninja >/dev/null 2>&1; the
 cmake -S . -B "$BUILD_DIR" $GEN -DCMAKE_BUILD_TYPE=Release >/dev/null
 cmake --build "$BUILD_DIR" --parallel "${BUILD_JOBS:-4}" >"$WORK/build.log" 2>&1 || { tail -40 "$WORK/build.log" >&2; fail "build"; }
 ok "build"
+python3 tests/check-host-flags.py schema/lmcell.dsl.json "$HOST" || fail "hard host flag cutover"
 ctest --test-dir "$BUILD_DIR" --output-on-failure || fail "native cell tests"
 ok "native cell regression tests"
 python3 scripts/check-version.py "$HOST" || fail "package version agreement"
@@ -42,26 +43,26 @@ cp schema/lmcell.dsl.json "$WORK/schema.before"
 python3 scripts/gen-schema.py >/dev/null || fail "scripts/gen-schema.py"
 cmp -s "$WORK/schema.before" schema/lmcell.dsl.json || fail "schema/lmcell.dsl.json was stale (now regenerated): rebuild and commit it"
 ok "schema matches the registrations in cpp/main.cpp"
-"$HOST" --dsl-schema --json >"$WORK/schema.json" || fail "embedded schema print"
+"$HOST" --lmcode-schema --json >"$WORK/schema.json" || fail "embedded schema print"
 cmp -s "$WORK/schema.json" schema/lmcell.dsl.json || fail "embedded schema differs from schema/lmcell.dsl.json"
-ok "--dsl-schema --json prints byte-identical embedded schema bytes"
-"$HOST" --dsl-signatures > "$WORK/host.sig"
-"$LMSCRIPT" --dsl-signatures schema/lmcell.dsl.json > "$WORK/compiler.sig"
+ok "--lmcode-schema --json prints byte-identical embedded schema bytes"
+"$HOST" --lmcode-signatures > "$WORK/host.sig"
+"$LMSCRIPT" --lmcode-signatures schema/lmcell.dsl.json > "$WORK/compiler.sig"
 diff -u "$WORK/compiler.sig" "$WORK/host.sig" || fail "host/compiler signatures differ"
 ok "host registry matches compiler signatures ($(wc -l < "$WORK/host.sig" | tr -d ' ') signatures)"
 
-"$HOST" --dsl-signatures >"$WORK/registry-signatures.txt"
-"$LMSCRIPT" --dsl-signatures cpp/std/lmcode-std.schema.json >"$WORK/standard-signatures.txt"
+"$HOST" --lmcode-signatures >"$WORK/registry-signatures.txt"
+"$LMSCRIPT" --lmcode-signatures cpp/std/lmcode-std.schema.json >"$WORK/standard-signatures.txt"
 python3 - "$WORK" <<'PYHOST'
 from pathlib import Path
 import sys
 work=Path(sys.argv[1])
 registry=set((work/'registry-signatures.txt').read_text().splitlines())
 standard=set((work/'standard-signatures.txt').read_text().splitlines())
-assert len(standard)==72, len(standard)
+assert len(standard)==206, len(standard)
 (work/'host-signatures.txt').write_bytes(''.join(line+'\n' for line in sorted(registry-standard)).encode('utf-8'))
 PYHOST
-diff -u <("$LMSCRIPT" --dsl-signatures schema/lmcell.dsl.json --without-std) "$WORK/host-signatures.txt" || fail "host-only registry/compiler signatures differ"
+diff -u <("$LMSCRIPT" --lmcode-signatures schema/lmcell.dsl.json --without-std) "$WORK/host-signatures.txt" || fail "host-only registry/compiler signatures differ"
 ok "host-only schema bytes and --without-std parity retain domain declarations"
 "$HOST" --notices >"$WORK/notices.txt" || fail "--notices"
 cmp -s "$WORK/notices.txt" THIRD_PARTY_NOTICES || fail "--notices differs from THIRD_PARTY_NOTICES"
@@ -101,10 +102,10 @@ for src in tests/*.lms examples/*.lms; do
   "$LMSCRIPT" "$src" "build/$name.dslb" >"$WORK/$name.log" 2>&1 || { cat "$WORK/$name.log" >&2; fail "$name compile"; }
   n=$((n+1))
 done
-ok "$n programs compile as bytecode v5"
+ok "$n programs compile as bytecode v6"
 for src in tests/*.lms examples/*.lms; do
   name="$(basename "$src" .lms)"
-  "$HOST" --dsl "build/$name.dslb" >"$WORK/$name.out" 2>"$WORK/$name.err" || { cat "$WORK/$name.out" "$WORK/$name.err" >&2; fail "$name run"; }
+  "$HOST" --lmcode "build/$name.dslb" >"$WORK/$name.out" 2>"$WORK/$name.err" || { cat "$WORK/$name.out" "$WORK/$name.err" >&2; fail "$name run"; }
   grep -q '"ok": true' "$WORK/$name.out" || { cat "$WORK/$name.out" >&2; fail "$name did not report ok"; }
   # No program prints, so stdout must be exactly the JSON result (no upstream chatter).
   [ "$(tr -d '\r' <"$WORK/$name.out")" = '{"ok": true, "result": null}' ] || { cat "$WORK/$name.out" >&2; fail "$name stdout is not only the JSON result"; }
@@ -115,7 +116,7 @@ ok "$n programs run, pass their own assertions and keep stdout to the JSON resul
 for f in build/examples/*.csv; do echo "$(sha "$f") $f"; done >"$WORK/before.txt"
 for src in examples/*.lms; do
   name="$(basename "$src" .lms)"
-  "$HOST" --dsl "build/$name.dslb" >/dev/null 2>&1 || fail "$name rerun"
+  "$HOST" --lmcode "build/$name.dslb" >/dev/null 2>&1 || fail "$name rerun"
 done
 for f in build/examples/*.csv; do echo "$(sha "$f") $f"; done >"$WORK/after.txt"
 cmp -s "$WORK/before.txt" "$WORK/after.txt" || fail "result files differ on rerun"
@@ -130,7 +131,7 @@ end _dsl_
 savedsl(p, "$WORK/$1.dslb");
 LMS
   "$LMSCRIPT" "$WORK/$1.lms" >/dev/null 2>"$WORK/$1.cerr" || { cat "$WORK/$1.cerr" >&2; fail "$1 compile"; }
-  set +e; out="$("$HOST" --dsl "$WORK/$1.dslb" 2>/dev/null)"; code=$?; set -e
+  set +e; out="$("$HOST" --lmcode "$WORK/$1.dslb" 2>/dev/null)"; code=$?; set -e
   [ "$code" = 3 ] || fail "$1: exit code $code, expected 3 ($out)"
   echo "$out" | grep -q "$3" || fail "$1: message lacks '$3': $out"
 }
@@ -162,12 +163,12 @@ ok "errors stop with exit 3 and clear messages (24 cases)"
 
 # Dry run loads/verifies bytecode without executing numerical work or writing CSV.
 rm -f build/examples/tissue_decay_profiles.csv
-"$HOST" --dry-run --dsl build/tissue_decay.dslb >"$WORK/dry.out" || fail "dry run"
+"$HOST" --dry-run --lmcode build/tissue_decay.dslb >"$WORK/dry.out" || fail "dry run"
 [ ! -e build/examples/tissue_decay_profiles.csv ] || fail "dry run created CSV"
-"$HOST" --dsl build/tissue_decay.dslb >/dev/null || fail "restore example CSV"
+"$HOST" --lmcode build/tissue_decay.dslb >/dev/null || fail "restore example CSV"
 ok "dry run verifies without writing outputs"
 
-for flags in '--unknown' '--version extra' '--dsl-schema --bogus' '--dry-run' '--dsl --bogus'; do
+for flags in '--unknown' '--version extra' '--lmcode-schema --bogus' '--dry-run' '--lmcode --bogus'; do
   set +e
   # Deliberate word splitting: each fixed test string is a CLI argument sequence.
   # shellcheck disable=SC2086
@@ -178,7 +179,7 @@ for flags in '--unknown' '--version extra' '--dsl-schema --bogus' '--dry-run' '-
 done
 ok "invalid CLI combinations use exit 2"
 
-set +e; "$HOST" --dsl "$WORK/does-not-exist.dslb" >/dev/null 2>&1; code=$?; set -e
+set +e; "$HOST" --lmcode "$WORK/does-not-exist.dslb" >/dev/null 2>&1; code=$?; set -e
 [ "$code" = 3 ] || fail "missing bytecode exit code $code, expected 3"
 set +e; "$HOST" >/dev/null 2>&1; code=$?; set -e
 [ "$code" = 2 ] || fail "usage exit code $code, expected 2"
@@ -200,11 +201,11 @@ end _dsl_
 savedsl(p, "$WORK/runaway.dslb");
 LMS
 "$LMSCRIPT" "$WORK/runaway.lms" >/dev/null || fail "runaway.lms compile"
-set +e; out="$(LMCELL_MAX_MEMORY_MB=64 "$HOST" --dsl "$WORK/runaway.dslb" 2>"$WORK/runaway.err")"; code=$?; set -e
+set +e; out="$(LMCELL_MAX_MEMORY_MB=64 "$HOST" --lmcode "$WORK/runaway.dslb" 2>"$WORK/runaway.err")"; code=$?; set -e
 [ "$code" = 3 ] || fail "runaway loop under LMCELL_MAX_MEMORY_MB=64: exit $code, expected 3 ($out)"
 echo "$out" | grep -q "memory budget exceeded" || fail "runaway loop: JSON lacks the budget message: $out"
 grep -q "LMCELL_MAX_MEMORY_MB" "$WORK/runaway.err" || fail "runaway loop: no budget message on stderr"
-set +e; LMCELL_MAX_MEMORY_MB=-5 "$HOST" --dsl "$WORK/runaway.dslb" >/dev/null 2>"$WORK/badenv.err"; code=$?; set -e
+set +e; LMCELL_MAX_MEMORY_MB=-5 "$HOST" --lmcode "$WORK/runaway.dslb" >/dev/null 2>"$WORK/badenv.err"; code=$?; set -e
 [ "$code" = 2 ] && grep -q "positive whole number" "$WORK/badenv.err" || fail "bad LMCELL_MAX_MEMORY_MB: exit $code"
 # Exponential division stops at the budget (checked before each new cell, not inside PhysiCell),
 # and a large voxel grid is refused before BioFVM builds it.
@@ -216,13 +217,13 @@ end _dsl_
 savedsl(p, "$WORK/$1.dslb");
 LMS
   "$LMSCRIPT" "$WORK/$1.lms" >/dev/null || fail "$1 compile"
-  set +e; out="$(LMCELL_MAX_MEMORY_MB=$2 "$HOST" --dsl "$WORK/$1.dslb" 2>/dev/null)"; code=$?; set -e
+  set +e; out="$(LMCELL_MAX_MEMORY_MB=$2 "$HOST" --lmcode "$WORK/$1.dslb" 2>/dev/null)"; code=$?; set -e
   [ "$code" = 3 ] && echo "$out" | grep -q "memory budget exceeded" || fail "$1 under LMCELL_MAX_MEMORY_MB=$2: exit $code ($out)"
 }
 expect_budget growth 64 'let s = cell.sim(1); s.cell_type("a").cycle(0.1).radius(1.0); let r = s.seed("a", 1, 0.0, 0.0).run(1000.0, 1.0);'
 expect_budget grid 64 'let r = cell.sim(1).domain(0.0, 1000.0, 0.0, 1000.0, 1.0).substrate("o2", 1.0, 0.1, 1.0, -1.0).run(1.0, 1.0);'
 if [ "$UNAME_S" = Linux ]; then
-  set +e; out="$(ulimit -v 6291456; "$HOST" --dsl "$WORK/runaway.dslb" 2>/dev/null)"; code=$?; set -e
+  set +e; out="$(ulimit -v 6291456; "$HOST" --lmcode "$WORK/runaway.dslb" 2>/dev/null)"; code=$?; set -e
   [ "$code" = 3 ] && echo "$out" | grep -q "limit 4096 MiB" || fail "runaway loop with the default budget under ulimit -v 6 GiB: exit $code ($out)"
   ok "memory budget: runaway loop stops at 64 MiB and at the default 4096 MiB (under ulimit -v 6 GiB); division growth and grids count"
 else
@@ -251,7 +252,7 @@ savedsl(p, {json.dumps(dslb_path)});
 (work / "std-e2e.lms").write_text(script)
 PYSTD
 "$LMSCRIPT" "$WORK/std-e2e.lms" >"$WORK/std-compile.log" 2>&1 || { cat "$WORK/std-compile.log" >&2; fail "std e2e compile"; }
-std_out="$("$HOST" --dsl "$WORK/std-e2e.dslb")" || fail "std e2e run failed"
+std_out="$("$HOST" --lmcode "$WORK/std-e2e.dslb")" || fail "std e2e run failed"
 python3 - "$std_out" <<'PYRUN' || fail "std e2e output mismatch: $std_out"
 import sys
 actual = sys.argv[1].replace("\r\n", "\n").replace("\r", "\n").splitlines()

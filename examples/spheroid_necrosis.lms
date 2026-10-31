@@ -35,7 +35,7 @@ r.history().save_csv("build/examples/spheroid_history.csv");
 r.profile_history().save_csv("build/examples/spheroid_field_history.csv");
 end _lmcode_
 savedsl(p, "build/spheroid_necrosis.dslb");
-r = system ${dsl_cli(p)} --dsl build/spheroid_necrosis.dslb;
+r = system ${dsl_cli(p)} --lmcode build/spheroid_necrosis.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -93,7 +93,7 @@ for (k in range(0,25)) {
 }
 end _lmcode_
 savedsl(v,"build/visual/spheroid_necrosis.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/spheroid_necrosis.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/spheroid_necrosis.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/spheroid_necrosis.png");

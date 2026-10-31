@@ -23,7 +23,7 @@ fn assay(name, grow) {
   r.history().save_csv(${"build/examples/wound_" + name + ".csv"});
 end _lmcode_
   savedsl(p, "build/wound_closure.dslb");
-  r = system ${dsl_cli(p)} --dsl build/wound_closure.dslb;
+  r = system ${dsl_cli(p)} --lmcode build/wound_closure.dslb;
   if (r.code!=0) { println(r.stdout); println(r.stderr); }
   assert(r.code==0);
 }
@@ -78,7 +78,7 @@ for (k in range(0,25)) {
 }
 end _lmcode_
 savedsl(v,"build/visual/wound_closure.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/wound_closure.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/wound_closure.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/wound_closure.png");

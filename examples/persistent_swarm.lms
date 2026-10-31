@@ -3,7 +3,7 @@ p = _lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest";
 let s=cell.sim(54321);s.cell_type("walker").motility(1.0,1.0).radius(1.0);let r=s.seed("walker",3000,0.0,0.0).run(20.0,0.05);cell.assert_true(r.live()==3000);r.cells().save_csv("build/examples/persistent_swarm.csv");
 end _lmcode_
 savedsl(p, "build/persistent_swarm.dslb");
-r = system ${dsl_cli(p)} --dsl build/persistent_swarm.dslb;
+r = system ${dsl_cli(p)} --lmcode build/persistent_swarm.dslb;
 assert(r.code == 0);
 
 mkdir("build/visual");
@@ -31,7 +31,7 @@ plot.cmd("plot 'build/examples/persistent_swarm.csv' using 1:2 with points pt 7 
 plot.close();
 end _lmcode_
 savedsl(v,"build/visual/persistent_swarm.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/persistent_swarm.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/persistent_swarm.dslb;
 assert(r.code==0);
 
 println("wrote images/persistent_swarm.png");

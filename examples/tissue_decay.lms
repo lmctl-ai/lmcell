@@ -9,7 +9,7 @@ r.counts().save_csv("build/examples/tissue_decay_counts.csv");
 r.profiles().save_csv("build/examples/tissue_decay_profiles.csv");
 end _lmcode_
 savedsl(p, "build/tissue_decay.dslb");
-r = system ${dsl_cli(p)} --dsl build/tissue_decay.dslb;
+r = system ${dsl_cli(p)} --lmcode build/tissue_decay.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -35,7 +35,7 @@ plot.cmd("plot 'build/examples/tissue_decay_profiles.csv' using 1:3 with points 
 plot.close();
 end _lmcode_
 savedsl(v,"build/visual/tissue_decay.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/tissue_decay.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/tissue_decay.dslb;
 assert(r.code==0);
 
 println("wrote images/tissue_decay.png");

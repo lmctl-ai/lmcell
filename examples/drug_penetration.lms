@@ -40,7 +40,7 @@ r.history().save_csv("build/examples/drug_history.csv");
 r.profile_history().save_csv("build/examples/drug_field_history.csv");
 end _lmcode_
 savedsl(p, "build/drug_penetration.dslb");
-r = system ${dsl_cli(p)} --dsl build/drug_penetration.dslb;
+r = system ${dsl_cli(p)} --lmcode build/drug_penetration.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 
@@ -86,7 +86,7 @@ for (k in range(0,25)) {
 }
 end _lmcode_
 savedsl(v,"build/visual/drug_penetration.dslb");
-r = system ${dsl_cli(v)} --dsl build/visual/drug_penetration.dslb;
+r = system ${dsl_cli(v)} --lmcode build/visual/drug_penetration.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/drug_penetration.png");

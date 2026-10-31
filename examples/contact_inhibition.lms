@@ -25,7 +25,7 @@ fn run_case(name, rule) {
   r.counts().save_csv(${"build/examples/contact_" + name + ".csv"});
 end _lmcode_
   savedsl(p, "build/contact_inhibition.dslb");
-  r = system ${dsl_cli(p)} --dsl build/contact_inhibition.dslb;
+  r = system ${dsl_cli(p)} --lmcode build/contact_inhibition.dslb;
   if (r.code!=0) { println(r.stdout); println(r.stderr); }
   assert(r.code==0);
 }
@@ -60,7 +60,7 @@ plot.cmd("unset multiplot");
 plot.close();
 end _lmcode_
 savedsl(v,"build/contact_inhibition_plot.dslb");
-r = system ${dsl_cli(v)} --dsl build/contact_inhibition_plot.dslb;
+r = system ${dsl_cli(v)} --lmcode build/contact_inhibition_plot.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/contact_inhibition.png");

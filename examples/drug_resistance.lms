@@ -22,7 +22,7 @@ fn therapy(name, dose) {
   r.type_counts().save_csv(${"build/examples/resistance_" + name + ".csv"});
 end _lmcode_
   savedsl(p, "build/drug_resistance.dslb");
-  r = system ${dsl_cli(p)} --dsl build/drug_resistance.dslb;
+  r = system ${dsl_cli(p)} --lmcode build/drug_resistance.dslb;
   if (r.code!=0) { println(r.stdout); println(r.stderr); }
   assert(r.code==0);
 }
@@ -53,7 +53,7 @@ plot.cmd("unset multiplot");
 plot.close();
 end _lmcode_
 savedsl(v,"build/drug_resistance_plot.dslb");
-r = system ${dsl_cli(v)} --dsl build/drug_resistance_plot.dslb;
+r = system ${dsl_cli(v)} --lmcode build/drug_resistance_plot.dslb;
 if (r.code!=0) { println(r.stdout); println(r.stderr); }
 assert(r.code==0);
 println("wrote images/drug_resistance.png");

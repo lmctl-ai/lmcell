@@ -7,7 +7,7 @@ host (lmnum) reached 16 GB RSS and filled the 24 GB machine; every host now has 
 
 - **Total memory budget**, default 4096 MiB, set with `LMCELL_MAX_MEMORY_MB` (positive whole
   MiB; anything else exits 2 with the usage text). Shown in the usage message. Configured in
-  `main` only for `--dsl` runs.
+  `main` only for `--lmcode` runs.
 - `cpp/memory_budget.{hpp,cpp}` (identical copy in every lm* host) replaces the global
   `operator new`/`delete` and counts block sizes from the C allocator. It is compiled into
   `cell_core`, so the ctest executable uses it too.
