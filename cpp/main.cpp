@@ -682,5 +682,10 @@ int main(int argc, char **argv) {
       break;
     }
   }
-  return results.write_frame(std::cout);
+  const int code = results.write_frame(std::cout);
+  std::cout.flush();
+  // A failed run (the memory budget, a runtime error) leaves a half-built simulation behind. Its teardown has nothing
+  // useful left to do and has been seen to crash on Windows before the frame reaches the pipe, so leave right here.
+  if (code != 0) { std::fflush(nullptr); std::_Exit(code); }
+  return code;
 }
