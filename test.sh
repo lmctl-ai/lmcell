@@ -231,8 +231,8 @@ $3
 end _lmcode_
 LMS
   capture_prog "$1" >/dev/null || fail "$1 compile"
-  set +e; out="$(LMCELL_MAX_MEMORY_MB=$2 "$HOST" --lmcode "$WORK/$1.capture/0.lmcode" 2>/dev/null)"; code=$?; set -e
-  [ "$code" = 3 ] && echo "$out" | grep -q "memory budget exceeded" || fail "$1 under LMCELL_MAX_MEMORY_MB=$2: exit $code ($out)"
+  set +e; out="$(LMCELL_MAX_MEMORY_MB=$2 "$HOST" --lmcode "$WORK/$1.capture/0.lmcode" 2>"$WORK/$1.budget.err")"; code=$?; set -e
+  [ "$code" = 3 ] && echo "$out" | grep -q "memory budget exceeded" || { cat "$WORK/$1.budget.err" >&2; fail "$1 under LMCELL_MAX_MEMORY_MB=$2: exit $code ($out)"; }
 }
 expect_budget growth 64 'let s = cell.sim(1); s.cell_type("a").cycle(0.1).radius(1.0); let r = s.seed("a", 1, 0.0, 0.0).run(1000.0, 1.0);'
 expect_budget grid 64 'let r = cell.sim(1).domain(0.0, 1000.0, 0.0, 1000.0, 1.0).substrate("o2", 1.0, 0.1, 1.0, -1.0).run(1.0, 1.0);'
