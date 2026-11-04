@@ -4,6 +4,7 @@
 #include "PhysiCell.h"
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <set>
@@ -277,9 +278,14 @@ Results run(const Config &cfg) {
       ph.secretion.saturation_densities[si] = 1;
     }
   }
-  // Destroy every cell before definitions/container, including on exceptions.
+  // Destroy every cell before definitions/container. Not while an exception unwinds: a throw inside
+  // PhysiCell (the memory budget, in register_agent's push_back) leaves a cell that records a voxel
+  // but is not in it, and delete_cell would scan past the end of that voxel looking for it. A failed
+  // run ends the process (one simulation per process), so its cells are simply left behind.
   struct Cleanup {
     ~Cleanup() {
+      if (std::uncaught_exceptions() > 0)
+        return;
       while (!all_cells->empty())
         delete_cell(all_cells->back());
     }

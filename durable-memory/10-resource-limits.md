@@ -20,11 +20,15 @@ host (lmnum) reached 16 GB RSS and filled the 24 GB machine; every host now has 
     scratch, 32 substrates 724 MB tracked / 925 MB RSS). The existing cap stays at 1e6 voxels.
   - cells: `require(16 KiB)` before every `create_cell` (seeds and divisions); a cell is about
     4.6 KiB tracked (100000 seeded cells: 460 MB). Exponential division therefore stops either at
-    the 100000-cell cap or at the budget, with a run error, never inside `create_cell`.
+    the 100000-cell cap or at the budget, with a run error. The budget can still trip inside
+    PhysiCell, for example when a crowded voxel's vector doubles.
 - PhysiCell does not catch `std::bad_alloc`; its `exit(-1)` calls are for XML/rules setup that
   lmcell does not use. A budget failure elsewhere inside BioFVM unwinds through ordinary C++
-  frames; `Cleanup` then deletes the fully built cells, and the one-simulation-per-process guard
-  stays consumed.
+  frames, and the one-simulation-per-process guard stays consumed. `Cleanup` deletes the cells only
+  on the normal path. A throw inside PhysiCell can leave a cell that records a voxel without being
+  in it (`assign_position` sets the voxel, then `register_agent`'s `push_back` throws), and
+  `delete_cell` would then scan past the end of that voxel: a heap over-read that crashed Windows
+  and went unnoticed on Linux. After a failed run the cells are left for process exit.
 - Exceeding the budget throws `membudget::Exceeded` (a `std::bad_alloc`); host methods turn it
   into a `dslvm::Error` with the same text and `main` also catches `std::exception` around
   `Program::load`/`run`. The first failure prints
