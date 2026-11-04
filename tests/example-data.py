@@ -7,7 +7,7 @@ work=Path(sys.argv[1])
 sources=sorted((root/'examples').glob('*.lms'))
 assert len(sources)==16, len(sources)
 for source in sources:
-    text=source.read_text()
+    text=source.read_text(encoding='utf-8')
     assert 'r.stdout' not in text, source
     renderer=re.search(r'^\s*\w+\s*=\s*_lmcode_ cli="(?:lmplot|lmcad|lmdraw|lmblender)"',text,re.M)
     assert renderer, source
