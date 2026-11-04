@@ -6,4 +6,5 @@ let m=r.cells();let sum=0.0;
 for(i in range(0,m.rows())) {let x=m.get(i,0);let y=m.get(i,1);sum=sum+x*x+y*y;}
 cell.assert_close(sum/float(m.rows()),18.0,1.8);
 end _lmcode_
-savedsl(p, "build/persistent_walk.dslb");
+r = run_lmcode(p);
+require(r.ok, json_stringify(r));

@@ -8,14 +8,13 @@ cell.assert_close(r.profiles().get(0,2),cell.eval("exp(-0.1)"),0.0001);
 r.counts().save_csv("build/examples/tissue_decay_counts.csv");
 r.profiles().save_csv("build/examples/tissue_decay_profiles.csv");
 end _lmcode_
-savedsl(p, "build/tissue_decay.dslb");
-r = system ${dsl_cli(p)} --lmcode build/tissue_decay.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(p);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 
 mkdir("build/visual");
 mkdir("images");
-v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot";
 plot.png("images/tissue_decay.png",900,520);
 plot.cmd("set datafile separator ','");
 plot.cmd("set border 3");
@@ -34,8 +33,7 @@ plot.cmd("set yrange [0:1.1]");
 plot.cmd("plot 'build/examples/tissue_decay_profiles.csv' using 1:3 with points pt 7 ps 1.2 lc rgb '#007f86' title 'Voxel samples at t=1 min', exp(-0.1) with lines ls 2 dt 2 title 'Exact uniform decay'");
 plot.close();
 end _lmcode_
-savedsl(v,"build/visual/tissue_decay.dslb");
-r = system ${dsl_cli(v)} --lmcode build/visual/tissue_decay.dslb;
-assert(r.code==0);
+r = run_lmcode(v);
+assert(r.ok);
 
 println("wrote images/tissue_decay.png");

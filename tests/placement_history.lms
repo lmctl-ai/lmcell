@@ -17,4 +17,5 @@ cell.assert_true(r.cells().get(0,0)>=0.0 && r.cells().get(0,0)<100.0);
 cell.assert_true(r.cells().get(50,0)>=144.0 && r.cells().get(50,0)<=156.0);
 cell.assert_true(r.cells().get(84,0)==100.0);
 end _lmcode_
-savedsl(p, "build/placement_history.dslb");
+r = run_lmcode(p);
+require(r.ok, json_stringify(r));

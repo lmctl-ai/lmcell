@@ -3,7 +3,7 @@
 Only --lmcode, --lmcode-schema and --lmcode-signatures select the host language
 protocol. The normal gate explicitly refuses all retired spellings before input
 file access and compares new schema/signature output with the owner/compiler.
-DSLB magic, .dslb paths and cell-model behavior are unchanged.
+DSLB v6 magic and cell-model behavior are unchanged; compiler inputs are private.
 
 The SDK is refreshed through sync-sdk.sh at 20325f7. Source compiler builds are
 qualified by v6/206-standard capabilities rather than package-version metadata.

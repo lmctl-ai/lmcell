@@ -54,7 +54,7 @@ mkdir try-lmcell && cd try-lmcell
 lmctl https://raw.githubusercontent.com/lmctl-ai/lmcell/main/examples/contact_inhibition.lms
 ```
 
-The first run downloads the lmcell and lmplot release binaries for your platform (Linux binaries require dynamic glibc >= 2.35, Ubuntu 22.04+); the example checks its numbers against the formula and writes `images/contact_inhibition.png`. Every command above works the same way from an empty folder. Examples that animate also write `images/<name>.gif` when `ffmpeg` is on your PATH; `tumour_render` additionally downloads lmblender.
+The first run downloads lmcell if needed; compatible lmplot must already be on PATH (Linux binaries require dynamic glibc >= 2.35, Ubuntu 22.04+); the example checks its numbers against the formula and writes `images/contact_inhibition.png`. Every command above works the same way from an empty folder. Examples that animate also write `images/<name>.gif` when `ffmpeg` is on your PATH; `tumour_render` additionally requires compatible local lmblender and lmdraw.
 
 ## Write your own
 
@@ -70,8 +70,7 @@ r.cells().save_csv("cells.csv");          # x, y, type, alive
 r.history().save_csv("history.csv");      # time, x, y, type, alive every 30 min
 r.profiles().save_csv("oxygen.csv");      # x, y, oxygen
 end _lmcode_
-savedsl(p, "tissue.dslb");
-system ${dsl_cli(p)} --lmcode tissue.dslb;
+run_lmcode(p);
 ```
 
 The host accepts only `--lmcode FILE...`, `--dry-run --lmcode FILE...`, `--version`, `--notices`, `--lmcode-schema [--json]` and `--lmcode-signatures`. Dry run verifies bytecode without running or writing outputs. Usage errors exit 2; load and run errors exit 3.
@@ -129,10 +128,16 @@ cmake --build build --parallel 4
 ./test.sh
 ```
 
-Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lmctl-ai/lmctl@0.2.420`). OpenMP is disabled through a tiny serial compatibility header. Linux links all scientific libraries and `libstdc++`/`libgcc` statically and uses only dynamic glibc (>= 2.35); macOS uses only system libraries; Windows links MinGW runtimes statically. Dependencies are pinned in `deps.lock` and fetched into ignored `third_party/`.
+Requires CMake 3.24+, C++17, git, Python 3 and lmscript for tests (`npm i -g @lmctl-ai/lmctl@0.2.460`). OpenMP is disabled through a tiny serial compatibility header. Linux links all scientific libraries and `libstdc++`/`libgcc` statically and uses only dynamic glibc (>= 2.35); macOS uses only system libraries; Windows links MinGW runtimes statically. Dependencies are pinned in `deps.lock` and fetched into ignored `third_party/`.
 
 Native tests compare against closed forms: exponential birth/death, Hill-modulated rates (including `rule_toward` from a zero base), persistent-walk MSD and isotropy, the cosh penetration profile, a linear profile between fixed edges (with and without diffusion substeps), the 2D Laplace problem on a square (centre = 1/4 and the Fourier series), chemotactic drift v·E[b] (1 and 2/π), the contact-inhibition carrying capacity, and volume-normalized uptake/secretion for one and two substrates. DSL programs and every example also run in `test.sh`, which checks pins, schema/compiler/registry parity, notices, runtime linkage, usage/error codes, dry runs, byte-identical reruns and the gallery. [Durable memory](durable-memory/index.md) records numerical details and release evidence.
 
 ## License
 
 The host is [MIT](LICENSE). PhysiCell and BioFVM are BSD-3-Clause; bundled pugixml and the scripting SDK are MIT. Their notices are embedded in `lmcell --notices` and included in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES). MaBoSS, PhysiBoSS, RoadRunner and GPL/LGPL dependencies are excluded. CMake creates a build-only BioFVM copy that removes premature global-options writes, and the wrapper explicitly binds substrate storage and initializes a field omitted by an upstream copy constructor; the pinned checkout stays unmodified. See [license and integration decisions](durable-memory/02-libraries-and-licenses.md). The drawing hosts (lmplot, lmdraw, lmblender) are separate programs downloaded at run time and carry their own licenses.
+
+Invocations return one terminal SDK frame: exit 0 success, 2 CLI/metadata,
+3 load/run, 4 application/output failure. Check `r.ok` after `run_lmcode`.
+Dry mode validates without running simulations or file operations. `cell.print`
+uses stderr; CSV files carry numerical data. Rendering requires compatible local
+lmplot/lmdraw/lmblender binaries.

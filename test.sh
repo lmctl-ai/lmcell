@@ -30,6 +30,17 @@ if [ ! -f "$BUILD_DIR/CMakeCache.txt" ] && command -v ninja >/dev/null 2>&1; the
 cmake -S . -B "$BUILD_DIR" $GEN -DCMAKE_BUILD_TYPE=Release >/dev/null
 cmake --build "$BUILD_DIR" --parallel "${BUILD_JOBS:-4}" >"$WORK/build.log" 2>&1 || { tail -40 "$WORK/build.log" >&2; fail "build"; }
 ok "build"
+export LMSCRIPT_BIN="$LMSCRIPT"
+export LMCELL_HOST="$(cd "$BUILD_DIR" && pwd)/$(basename "$HOST")"
+export LMCELL_SHIM="$(cd "$BUILD_DIR" && pwd)/invocation_shim"
+case "$UNAME_S" in MINGW*|MSYS*|CYGWIN*)
+  export LMCELL_HOST="$(cd "$BUILD_DIR" && pwd -W | tr '\\' '/')/$(basename "$HOST")"
+  export LMCELL_SHIM="$(cd "$BUILD_DIR" && pwd -W | tr '\\' '/')/invocation_shim.exe";;
+esac
+run_prog() { python3 tests/invocation.py "$@"; }
+capture_prog() { run_prog --capture-only --capture "$WORK/$1.capture" "$WORK/$1.lms" >/dev/null; }
+printf 's = load_schema(cli="lmcell");\n' >"$WORK/discover.lms"
+"$LMSCRIPT" "$WORK/discover.lms" >/dev/null || fail "host schema discovery"
 python3 tests/check-host-flags.py schema/lmcell.dsl.json "$HOST" || fail "hard host flag cutover"
 ctest --test-dir "$BUILD_DIR" --output-on-failure || fail "native cell tests"
 ok "native cell regression tests"
@@ -95,29 +106,35 @@ esac
 mkdir -p build/examples images
 rm -f images/*.png
 n=0
-for src in tests/*.lms examples/*.lms; do
+for src in tests/*.lms; do
   name="$(basename "$src" .lms)"
   [ ! -e "$WORK/compiled-$name" ] || fail "duplicate program basename: $name"
   touch "$WORK/compiled-$name"
-  "$LMSCRIPT" "$src" "build/$name.dslb" >"$WORK/$name.log" 2>&1 || { cat "$WORK/$name.log" >&2; fail "$name compile"; }
+  run_prog --capture-only --capture "$WORK/$name.capture" "$src" >"$WORK/$name.log" 2>&1 || { cat "$WORK/$name.log" >&2; fail "$name compile"; }
+  python3 - "$WORK/$name.capture/0.lmcode" schema/lmcell.dsl.json <<'PYBYTE'
+import hashlib,pathlib,sys
+b=pathlib.Path(sys.argv[1]).read_bytes()
+assert b[:6] == b'DSLB\0\6'
+assert b[6:38] == hashlib.sha256(pathlib.Path(sys.argv[2]).read_bytes()).digest()
+PYBYTE
   n=$((n+1))
 done
 ok "$n programs compile as bytecode v6"
-for src in tests/*.lms examples/*.lms; do
+for src in tests/*.lms; do
   name="$(basename "$src" .lms)"
-  "$HOST" --lmcode "build/$name.dslb" >"$WORK/$name.out" 2>"$WORK/$name.err" || { cat "$WORK/$name.out" "$WORK/$name.err" >&2; fail "$name run"; }
-  grep -q '"ok": true' "$WORK/$name.out" || { cat "$WORK/$name.out" >&2; fail "$name did not report ok"; }
+  "$HOST" --lmcode "$WORK/$name.capture/0.lmcode" >"$WORK/$name.out" 2>"$WORK/$name.err" || { cat "$WORK/$name.out" "$WORK/$name.err" >&2; fail "$name run"; }
+  grep -q '"ok":true' "$WORK/$name.out" || { cat "$WORK/$name.out" >&2; fail "$name did not report ok"; }
   # No program prints, so stdout must be exactly the JSON result (no upstream chatter).
-  [ "$(tr -d '\r' <"$WORK/$name.out")" = '{"ok": true, "result": null}' ] || { cat "$WORK/$name.out" >&2; fail "$name stdout is not only the JSON result"; }
+  [ "$(tr -d '\r' <"$WORK/$name.out")" = $'LMCODE_RETURN_BEGIN\n{"ok":true,"result":null}\nLMCODE_RETURN_END' ] || { cat "$WORK/$name.out" >&2; fail "$name stdout is not only the JSON result"; }
 done
 ok "$n programs run, pass their own assertions and keep stdout to the JSON result"
 
+python3 tests/example-data.py "$WORK" || fail "offline gallery workflows"
+ok "all 16 offline gallery workflows and parameter sweeps"
+
 # Determinism: the CSV files the examples write are identical on rerun.
 for f in build/examples/*.csv; do echo "$(sha "$f") $f"; done >"$WORK/before.txt"
-for src in examples/*.lms; do
-  name="$(basename "$src" .lms)"
-  "$HOST" --lmcode "build/$name.dslb" >/dev/null 2>&1 || fail "$name rerun"
-done
+python3 tests/example-data.py "$WORK" || fail "offline gallery rerun"
 for f in build/examples/*.csv; do echo "$(sha "$f") $f"; done >"$WORK/after.txt"
 cmp -s "$WORK/before.txt" "$WORK/after.txt" || fail "result files differ on rerun"
 ok "all $(wc -l <"$WORK/after.txt" | tr -d ' ') result files are byte-identical on rerun"
@@ -125,13 +142,12 @@ ok "all $(wc -l <"$WORK/after.txt" | tr -d ' ') result files are byte-identical 
 # Error paths: each snippet must fail the run with exit 3 and a message naming the problem.
 expect_error() { # name, snippet, expected message fragment
   cat >"$WORK/$1.lms" <<LMS
-p = _dsl_ cli="lmcell";
+p = _lmcode_ cli="lmcell";
 $2
-end _dsl_
-savedsl(p, "$WORK/$1.dslb");
+end _lmcode_
 LMS
-  "$LMSCRIPT" "$WORK/$1.lms" >/dev/null 2>"$WORK/$1.cerr" || { cat "$WORK/$1.cerr" >&2; fail "$1 compile"; }
-  set +e; out="$("$HOST" --lmcode "$WORK/$1.dslb" 2>/dev/null)"; code=$?; set -e
+  run_prog --check "$WORK/$1.lms" >/dev/null 2>"$WORK/$1.cerr" || { cat "$WORK/$1.cerr" >&2; fail "$1 compile"; }
+  set +e; out="$(run_prog "$WORK/$1.lms" 2>/dev/null)"; code=$?; set -e
   [ "$code" = 3 ] || fail "$1: exit code $code, expected 3 ($out)"
   echo "$out" | grep -q "$3" || fail "$1: message lacks '$3': $out"
 }
@@ -163,9 +179,9 @@ ok "errors stop with exit 3 and clear messages (24 cases)"
 
 # Dry run loads/verifies bytecode without executing numerical work or writing CSV.
 rm -f build/examples/tissue_decay_profiles.csv
-"$HOST" --dry-run --lmcode build/tissue_decay.dslb >"$WORK/dry.out" || fail "dry run"
+"$HOST" --dry-run --lmcode "$WORK/tissue_decay.capture/0.lmcode" >"$WORK/dry.out" || fail "dry run"
 [ ! -e build/examples/tissue_decay_profiles.csv ] || fail "dry run created CSV"
-"$HOST" --lmcode build/tissue_decay.dslb >/dev/null || fail "restore example CSV"
+"$HOST" --lmcode "$WORK/tissue_decay.capture/0.lmcode" >/dev/null || fail "restore example CSV"
 ok "dry run verifies without writing outputs"
 
 for flags in '--unknown' '--version extra' '--lmcode-schema --bogus' '--dry-run' '--lmcode --bogus'; do
@@ -179,7 +195,7 @@ for flags in '--unknown' '--version extra' '--lmcode-schema --bogus' '--dry-run'
 done
 ok "invalid CLI combinations use exit 2"
 
-set +e; "$HOST" --lmcode "$WORK/does-not-exist.dslb" >/dev/null 2>&1; code=$?; set -e
+set +e; "$HOST" --lmcode "$WORK/does-not-exist.lmcode" >/dev/null 2>&1; code=$?; set -e
 [ "$code" = 3 ] || fail "missing bytecode exit code $code, expected 3"
 set +e; "$HOST" >/dev/null 2>&1; code=$?; set -e
 [ "$code" = 2 ] || fail "usage exit code $code, expected 2"
@@ -190,40 +206,38 @@ ok "usage and load errors use exit codes 2 and 3"
 # 4096 MiB under a 6 GiB address-space limit (ulimit only here, never in the host). One cheap
 # 1e6-step run (one voxel, no cells), then every counts() copy keeps a 16 MB Matrix in the arena.
 cat >"$WORK/runaway.lms" <<LMS
-p = _dsl_ cli="lmcell";
+p = _lmcode_ cli="lmcell";
 let r = cell.sim(1).domain(0.0, 20.0, 0.0, 20.0, 20.0).run(100000.0, 0.1);
 let i = 0;
 while (i < 1000000) {
   let m = r.counts();
   i = i + 1;
 }
-end _dsl_
-savedsl(p, "$WORK/runaway.dslb");
+end _lmcode_
 LMS
-"$LMSCRIPT" "$WORK/runaway.lms" >/dev/null || fail "runaway.lms compile"
-set +e; out="$(LMCELL_MAX_MEMORY_MB=64 "$HOST" --lmcode "$WORK/runaway.dslb" 2>"$WORK/runaway.err")"; code=$?; set -e
+capture_prog runaway >/dev/null || fail "runaway.lms compile"
+set +e; out="$(LMCELL_MAX_MEMORY_MB=64 "$HOST" --lmcode "$WORK/runaway.capture/0.lmcode" 2>"$WORK/runaway.err")"; code=$?; set -e
 [ "$code" = 3 ] || fail "runaway loop under LMCELL_MAX_MEMORY_MB=64: exit $code, expected 3 ($out)"
 echo "$out" | grep -q "memory budget exceeded" || fail "runaway loop: JSON lacks the budget message: $out"
 grep -q "LMCELL_MAX_MEMORY_MB" "$WORK/runaway.err" || fail "runaway loop: no budget message on stderr"
-set +e; LMCELL_MAX_MEMORY_MB=-5 "$HOST" --lmcode "$WORK/runaway.dslb" >/dev/null 2>"$WORK/badenv.err"; code=$?; set -e
+set +e; LMCELL_MAX_MEMORY_MB=-5 "$HOST" --lmcode "$WORK/runaway.capture/0.lmcode" >/dev/null 2>"$WORK/badenv.err"; code=$?; set -e
 [ "$code" = 2 ] && grep -q "positive whole number" "$WORK/badenv.err" || fail "bad LMCELL_MAX_MEMORY_MB: exit $code"
 # Exponential division stops at the budget (checked before each new cell, not inside PhysiCell),
 # and a large voxel grid is refused before BioFVM builds it.
 expect_budget() { # name, MiB, snippet
   cat >"$WORK/$1.lms" <<LMS
-p = _dsl_ cli="lmcell";
+p = _lmcode_ cli="lmcell";
 $3
-end _dsl_
-savedsl(p, "$WORK/$1.dslb");
+end _lmcode_
 LMS
-  "$LMSCRIPT" "$WORK/$1.lms" >/dev/null || fail "$1 compile"
-  set +e; out="$(LMCELL_MAX_MEMORY_MB=$2 "$HOST" --lmcode "$WORK/$1.dslb" 2>/dev/null)"; code=$?; set -e
+  capture_prog "$1" >/dev/null || fail "$1 compile"
+  set +e; out="$(LMCELL_MAX_MEMORY_MB=$2 "$HOST" --lmcode "$WORK/$1.capture/0.lmcode" 2>/dev/null)"; code=$?; set -e
   [ "$code" = 3 ] && echo "$out" | grep -q "memory budget exceeded" || fail "$1 under LMCELL_MAX_MEMORY_MB=$2: exit $code ($out)"
 }
 expect_budget growth 64 'let s = cell.sim(1); s.cell_type("a").cycle(0.1).radius(1.0); let r = s.seed("a", 1, 0.0, 0.0).run(1000.0, 1.0);'
 expect_budget grid 64 'let r = cell.sim(1).domain(0.0, 1000.0, 0.0, 1000.0, 1.0).substrate("o2", 1.0, 0.1, 1.0, -1.0).run(1.0, 1.0);'
 if [ "$UNAME_S" = Linux ]; then
-  set +e; out="$(ulimit -v 6291456; "$HOST" --lmcode "$WORK/runaway.dslb" 2>/dev/null)"; code=$?; set -e
+  set +e; out="$(ulimit -v 6291456; "$HOST" --lmcode "$WORK/runaway.capture/0.lmcode" 2>/dev/null)"; code=$?; set -e
   [ "$code" = 3 ] && echo "$out" | grep -q "limit 4096 MiB" || fail "runaway loop with the default budget under ulimit -v 6 GiB: exit $code ($out)"
   ok "memory budget: runaway loop stops at 64 MiB and at the default 4096 MiB (under ulimit -v 6 GiB); division growth and grids count"
 else
@@ -235,7 +249,6 @@ python3 - "$WORK" schema/lmcell.dsl.json <<'PYSTD'
 import json, pathlib, sys
 work = pathlib.Path(sys.argv[1])
 schema_path = str(pathlib.Path(sys.argv[2]).resolve()).replace('\\', '/')
-dslb_path = str((work / "std-e2e.dslb").resolve()).replace('\\', '/')
 file_path = str((work / "std-data.txt").resolve()).replace('\\', '/')
 
 script = f'''p = _lmcode_ schema={json.dumps(schema_path)};
@@ -247,21 +260,32 @@ file_write({json.dumps(file_path)}, items.at(0) + ":" + items.at(1) + ":" + str(
 let read_back = file_read({json.dumps(file_path)});
 cell.print(read_back);
 end _lmcode_
-savedsl(p, {json.dumps(dslb_path)});
+
 '''
 (work / "std-e2e.lms").write_text(script)
 PYSTD
-"$LMSCRIPT" "$WORK/std-e2e.lms" >"$WORK/std-compile.log" 2>&1 || { cat "$WORK/std-compile.log" >&2; fail "std e2e compile"; }
-std_out="$("$HOST" --lmcode "$WORK/std-e2e.dslb")" || fail "std e2e run failed"
-python3 - "$std_out" <<'PYRUN' || fail "std e2e output mismatch: $std_out"
-import sys
-actual = sys.argv[1].replace("\r\n", "\n").replace("\r", "\n").splitlines()
-expected = ["CELL:sim:42", '{"ok": true, "result": null}']
-assert actual == expected, actual
+run_prog "$WORK/std-e2e.lms" >"$WORK/std-out" 2>"$WORK/std-err" || fail "std e2e run"
+python3 - "$WORK" <<'PYRUN' || fail "std e2e output mismatch"
+import json,sys
+from pathlib import Path
+w=Path(sys.argv[1])
+assert json.loads((w/'std-out').read_text())=={'ok':True,'result':None}
+assert (w/'std-err').read_text().splitlines()==['CELL:sim:42']
+assert (w/'std-data.txt').read_text()=='CELL:sim:42'
 PYRUN
 ok "implicit standard library end-to-end (string, math, collections, file)"
 
-python3 scripts/check-gallery.py --generated
+python3 tests/protocol.py "$WORK" || fail "invocation protocol"
+ok "builder ordering, framing, load-before-effects and dry metadata"
+if lmplot --lmcode-schema --json >/dev/null 2>&1 && lmdraw --lmcode-schema --json >/dev/null 2>&1 && lmblender --lmcode-schema --json >/dev/null 2>&1; then
+  for src in examples/*.lms; do
+    "$LMSCRIPT" "$src" >"$WORK/gallery.log" 2>&1 || { cat "$WORK/gallery.log" >&2; fail "gallery $src"; }
+  done
+  python3 scripts/check-gallery.py --generated
+else
+  echo "SKIP rendering: compatible lmplot/lmdraw/lmblender unavailable"
+  python3 scripts/check-gallery.py
+fi
 ok "gallery links, image signatures, dimensions and byte budgets"
 
 echo "all $pass checks passed"

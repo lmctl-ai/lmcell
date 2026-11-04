@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(lmcell VERSION 0.1.3 LANGUAGES C CXX)
+project(lmcell VERSION 0.1.4 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -116,4 +116,9 @@ if(BUILD_TESTING AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/scientific.cpp")
   endforeach()
   add_test(NAME gradient_substeps COMMAND scientific_tests gradient substeps)
   set_tests_properties(gradient_substeps PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+
+if(BUILD_TESTING)
+  add_executable(invocation_shim tests/shim.cpp)
+  static_executable(invocation_shim)
 endif()

@@ -22,17 +22,16 @@ fn assay(name, grow) {
   if (${grow} == 1) { cell.assert_true(inside/700.0 > 0.75); } else { cell.assert_true(inside/700.0 < 0.6); }
   r.history().save_csv(${"build/examples/wound_" + name + ".csv"});
 end _lmcode_
-  savedsl(p, "build/wound_closure.dslb");
-  r = system ${dsl_cli(p)} --lmcode build/wound_closure.dslb;
-  if (r.code!=0) { println(r.stdout); println(r.stderr); }
-  assert(r.code==0);
+  r = run_lmcode(p);
+  if (!r.ok) { println(json_stringify(r)); }
+  assert(r.ok);
 }
 assay("move", 0);
 assay("grow", 1);
 
 mkdir("build/visual");
 mkdir("images");
-v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot";
 plot.png("images/wound_closure.png",900,640);
 plot.cmd("set datafile separator ','");
 plot.cmd("set tics nomirror out; set border 3");
@@ -77,10 +76,9 @@ for (k in range(0,25)) {
   plot.close();
 }
 end _lmcode_
-savedsl(v,"build/visual/wound_closure.dslb");
-r = system ${dsl_cli(v)} --lmcode build/visual/wound_closure.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(v);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 println("wrote images/wound_closure.png");
 if (which("ffmpeg") != null) {
 f = system ffmpeg -y -v error -framerate 5 -i build/visual/wound_closure-frame-%d.png -vf "scale=560:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=32[p];[b][p]paletteuse" -loop 0 images/wound_closure.gif;

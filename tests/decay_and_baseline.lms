@@ -7,4 +7,5 @@ cell.assert_close(r.cells().get(0,0),0.0,0.0);
 cell.assert_close(r.profiles().get(0,2),cell.eval("2*exp(-0.5)"),0.0005);
 cell.assert_true(r.substrate(0)=="drug");
 end _lmcode_
-savedsl(p, "build/decay_and_baseline.dslb");
+r = run_lmcode(p);
+require(r.ok, json_stringify(r));

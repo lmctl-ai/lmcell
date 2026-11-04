@@ -24,10 +24,9 @@ fn run_case(name, rule) {
   }
   r.counts().save_csv(${"build/examples/contact_" + name + ".csv"});
 end _lmcode_
-  savedsl(p, "build/contact_inhibition.dslb");
-  r = system ${dsl_cli(p)} --lmcode build/contact_inhibition.dslb;
-  if (r.code!=0) { println(r.stdout); println(r.stderr); }
-  assert(r.code==0);
+  r = run_lmcode(p);
+  if (!r.ok) { println(json_stringify(r)); }
+  assert(r.ok);
 }
 run_case("k3", 3);
 run_case("k5", 5);
@@ -35,7 +34,7 @@ run_case("k8", 8);
 run_case("free", 0);
 
 mkdir("images");
-v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot";
 plot.png("images/contact_inhibition.png",900,500);
 plot.cmd("set datafile separator ','");
 plot.cmd("set tics nomirror out; set border 3; set grid back lc rgb '#e4e9ef'");
@@ -59,8 +58,7 @@ plot.cmd("plot 0.02*(1-x**2/(25+x**2)) with lines lc rgb '#5864a8' lw 2.5 title 
 plot.cmd("unset multiplot");
 plot.close();
 end _lmcode_
-savedsl(v,"build/contact_inhibition_plot.dslb");
-r = system ${dsl_cli(v)} --lmcode build/contact_inhibition_plot.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(v);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 println("wrote images/contact_inhibition.png");

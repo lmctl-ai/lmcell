@@ -6,4 +6,5 @@ cell.assert_true(r.profiles().cols()==4);
 cell.assert_close(r.profiles().get(0,2),cell.eval("exp(-0.1)"),0.0001);
 cell.assert_close(r.profiles().get(0,3),cell.eval("2*exp(-0.2)"),0.0002);
 end _lmcode_
-savedsl(p, "build/substrates.dslb");
+r = run_lmcode(p);
+require(r.ok, json_stringify(r));

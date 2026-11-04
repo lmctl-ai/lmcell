@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-MIN_VERSION="0.2.420"
+MIN_VERSION="0.2.454"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/lmcode-compiler-XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 case "$(uname -s)" in
@@ -9,36 +9,26 @@ esac
 candidate="${LMSCRIPT_BIN:-}"
 if [[ -z "$candidate" ]]; then candidate="$(command -v lmscript || true)"; fi
 if [[ -z "$candidate" ]]; then echo "error: no lmscript compiler found; install @lmctl-ai/lmctl >= $MIN_VERSION or set LMSCRIPT_BIN" >&2; exit 2; fi
-# Test source compiler capabilities; its package version may be historical.
+# Validate capabilities, not the package version: the compiler must check an
+# _lmcode_ block against a raw host schema and know run_lmcode. It writes no
+# bytecode files any more; test.sh checks the v6 header and schema hash on the
+# private program files the host receives.
 SCHEMA="$WORK/implicit-std.schema.json"
-PROBE="$WORK/probe.lms"
 cat > "$SCHEMA" <<'JSON'
 {"dsl.schema":2,"name":"implicit_std_probe","types":{},"functions":{},"context":{}}
 JSON
-python3 - "$SCHEMA" "$PROBE" "$WORK" <<'PY'
+python3 - "$SCHEMA" "$WORK" <<'PY'
 import json, pathlib, sys
-schema, probe, work = sys.argv[1:]
-def source(marker):
-    return (f'p = {marker} schema={json.dumps(schema)};\n'
-            'let value = <<~STD_PROBE;\n'
-            '  raw ${not_an_outer_field} "quotes"\n'
-            '  STD_PROBE\n'
-            'let n = str_len(value);\n'
-            f'end {marker}\n'
-            f'savedsl(p, {json.dumps(str(pathlib.Path(work) / (marker[1:-1] + ".dslb")))});\n')
-pathlib.Path(probe).write_text(source('_dsl_'))
-pathlib.Path(work, 'probe-lmcode.lms').write_text(source('_lmcode_'))
+schema, work = sys.argv[1:]
+pathlib.Path(work, 'probe-lmcode.lms').write_text(
+    f'p = _lmcode_ schema={json.dumps(schema)};\n'
+    'let value = <<~STD_PROBE;\n'
+    '  raw ${not_an_outer_field} "quotes"\n'
+    '  STD_PROBE\n'
+    'let n = str_len(value);\n'
+    'end _lmcode_\n'
+    'r = run_lmcode(p, {command: ["lmcell", "--lmcode", "$DSLFILE"]});\n')
 PY
-for source in "$PROBE" "$WORK/probe-lmcode.lms"; do
-  out="$WORK/$(basename "$source" .lms | sed 's/^probe$/dsl/; s/^probe-lmcode$/lmcode/')".dslb
-  "$candidate" "$source" "$out" >"$WORK/compiler.out" 2>"$WORK/compiler.err" || { cat "$WORK/compiler.err" >&2; exit 2; }
-  python3 - "$out" "$SCHEMA" <<'PY'
-import hashlib, pathlib, sys
-bytecode = pathlib.Path(sys.argv[1]).read_bytes()
-schema = pathlib.Path(sys.argv[2]).read_bytes()
-if bytecode[:6] != b'DSLB\x00\x06': raise SystemExit('error: compiler did not emit DSL bytecode v6')
-if bytecode[6:38] != hashlib.sha256(schema).digest(): raise SystemExit('error: bytecode schema hash does not match raw host schema bytes')
-PY
-done
+"$candidate" --check "$WORK/probe-lmcode.lms" >"$WORK/compiler.out" 2>"$WORK/compiler.err" || { cat "$WORK/compiler.err" >&2; echo "error: compiler cannot check an _lmcode_ block with run_lmcode against the host schema" >&2; exit 2; }
 "$candidate" --lmcode-signatures "$SCHEMA" | grep -Fq 'fn str_len(string) -> int' || { echo "error: compiler inspection surface lacks implicit std fn str_len(string) -> int" >&2; exit 2; }
 printf '%s\n' "$candidate"

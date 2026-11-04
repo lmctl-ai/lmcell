@@ -30,14 +30,13 @@ cell.assert_close((b2-a2)/180.0,1.5,0.06);
 h.save_csv("build/examples/chemotaxis_history.csv");
 r.profiles().save_csv("build/examples/chemotaxis_field.csv");
 end _lmcode_
-savedsl(p, "build/chemotaxis_drift.dslb");
-r = system ${dsl_cli(p)} --lmcode build/chemotaxis_drift.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(p);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 
 mkdir("build/visual");
 mkdir("images");
-v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot";
 plot.png("images/chemotaxis_drift.png",900,470);
 plot.cmd("set datafile separator ','");
 plot.cmd("set style line 1 lc rgb '#8a8f98' lw 3");
@@ -79,10 +78,9 @@ for (k in range(0,41)) {
   plot.close();
 }
 end _lmcode_
-savedsl(v,"build/visual/chemotaxis_drift.dslb");
-r = system ${dsl_cli(v)} --lmcode build/visual/chemotaxis_drift.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(v);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 println("wrote images/chemotaxis_drift.png");
 if (which("ffmpeg") != null) {
 f = system ffmpeg -y -v error -framerate 8 -i build/visual/chemotaxis_drift-frame-%d.png -vf "scale=600:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse" -loop 0 images/chemotaxis_drift.gif;

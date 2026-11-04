@@ -1,6 +1,6 @@
 # lmcell durable memory
 
-`lmcell` is a static, dependency-free lmscript `_dsl_` host for cellular automata, tissue simulation, reaction-diffusion, and spatial biology.
+`lmcell` is a static, dependency-free lmscript `_lmcode_` host for cellular automata, tissue simulation, reaction-diffusion, and spatial biology.
 Repository: https://github.com/lmctl-ai/lmcell.
 
 ## 60-second takeover
@@ -38,8 +38,8 @@ scripts/sync-sdk.sh --verify          # Verifies vendored headers match sdk.lock
 ## Adding an example or function
 
 ### Adding an example
-1. Create `examples/<name>.lms` using `_dsl_ cli="lmcell" install="github:lmctl-ai/lmcell@latest"`.
-2. Run script: `build/lmcell run examples/<name>.lms` or via `lmscript`.
+1. Create `examples/<name>.lms` using `_lmcode_ cli="lmcell" install="github:lmctl-ai/lmcell@latest"`.
+2. Run script: `PATH="$PWD/build:$PATH" lmscript examples/<name>.lms`.
 3. Add the example to `./test.sh` test run list.
 4. Save visual output to `docs/images/<name>.png` and update `README.md` demo table with `lmctl autorun` command.
 
@@ -51,3 +51,5 @@ scripts/sync-sdk.sh --verify          # Verifies vendored headers match sdk.lock
 ## Releases
 
 Releases are triggered automatically on push of a `v*` tag. The release workflow builds across Linux x64/arm64, macOS x64/arm64, and Windows x64, publishing platform binaries with `SHA256SUMS`, `LICENSE`, and `THIRD_PARTY_NOTICES`. See `next-release-version.md` for version bump guidelines before tagging.
+
+- [11-invocation-envelope.md](11-invocation-envelope.md): protocol, dry mode, portable tests.

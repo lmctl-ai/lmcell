@@ -17,14 +17,13 @@ cell.assert_true(r.live() > 1500 && r.cells().rows() > r.live() + 400);
 r.cells().save_csv("build/examples/tumour_render_cells.csv");
 r.profiles().save_csv("build/examples/tumour_render_field.csv");
 end _lmcode_
-savedsl(p, "build/tumour_render.dslb");
-r = system ${dsl_cli(p)} --lmcode build/tumour_render.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(p);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 
 # Ground texture: the nutrient field, edge to edge, no axes.
 mkdir("build/visual");
-v = _lmcode_ cli="lmplot" install="github:lmctl-ai/lmplot@latest";
+v = _lmcode_ cli="lmplot";
 plot.png("build/visual/tumour_ground.png",600,600);
 plot.cmd("set datafile separator ','");
 plot.cmd("set lmargin at screen 0; set rmargin at screen 1; set tmargin at screen 1; set bmargin at screen 0; unset border; unset tics; unset key; unset colorbox");
@@ -34,10 +33,9 @@ plot.cmd("set view map; set pm3d map interpolate 4,4; set dgrid3d 30,30 splines"
 plot.cmd("splot 'build/examples/tumour_render_field.csv' using 1:2:3 with pm3d");
 plot.close();
 end _lmcode_
-savedsl(v,"build/visual/tumour_ground.dslb");
-r = system ${dsl_cli(v)} --lmcode build/visual/tumour_ground.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(v);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 
 # Geometry: one icosphere (42 vertices, 80 faces) per cell, 1 scene unit = 100 um.
 fn norm(p) { let l = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]); return [p[0] / l, p[1] / l, p[2] / l]; }
@@ -87,7 +85,7 @@ write_file("build/visual/tumour_ground.obj", "v -2.9 -2.9 0\nv 2.9 -2.9 0\nv 2.9
 println(sprintf("%d cells (%d live) -> %d triangles", rows.len(), nlive, rows.len() * F2.len()));
 
 mkdir("images");
-b = _lmcode_ cli="lmblender" install="github:lmctl-ai/lmblender@latest";
+b = _lmcode_ cli="lmblender";
 let cells = scene.import_obj("build/visual/tumour_cells.obj");
 cells.set_smooth(true);
 let ground = scene.import_obj("build/visual/tumour_ground.obj");
@@ -100,13 +98,9 @@ scene.camera_look_at(0.0, -4.1, 2.9, 0.0, -0.1, 0.0, 38.0);
 scene.render_settings(6, 7, true);
 scene.render_png("build/visual/tumour_render_full.png", 24, 900, 520);
 end _lmcode_
-savedsl(b, "build/visual/tumour_render.dslb");
-argv = dsl_cli(b);
-push(argv, "--lmcode");
-push(argv, "build/visual/tumour_render.dslb");
-r = system(argv, 600000);
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(b);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 # A 256-colour palette keeps the gallery PNG small; without ffmpeg the full render is used.
 if (which("ffmpeg") != null) {
 q = system ffmpeg -y -v error -i build/visual/tumour_render_full.png -vf "split[a][b];[a]palettegen=max_colors=256[p];[b][p]paletteuse=dither=sierra2_4a" -pix_fmt pal8 images/tumour_render.png;

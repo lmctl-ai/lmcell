@@ -2,7 +2,7 @@
 
 examples/tissue_decay.lms asserts survival of a nonmotile cell and uniform exponential substrate decay, then writes counts and profiles. examples/oxygen_rules.lms asserts the exponential survival expectation when oxygen is exactly at a Hill rule's half-max, then writes population counts and final cells. All four files under build/examples/ are byte-identical on rerun with the same seed on the same platform.
 
-Six DSL tests separately exercise the quiescent/decay baseline, exponential growth, apoptosis, independent multiple substrates, persistent-walk MSD and normalized uptake. All eight programs compile and run in test.sh. Example system calls use dsl_cli(p) so execution uses the same host that supplied the schema; bytecode and CSV stay under build/.
+Six DSL tests separately exercise the quiescent/decay baseline, exponential growth, apoptosis, independent multiple substrates, persistent-walk MSD and normalized uptake. All eight programs compile and run in test.sh. Examples use run_lmcode(p) and check r.ok; CSV data stays under build/.
 
 ## Story examples (2026-10-23)
 
@@ -17,4 +17,4 @@ Sixteen examples. The eight verification examples above plus eight stories, each
 - chemotaxis_drift: three bias populations in a linear gradient; asserts drift speeds 0, 2v/pi, v within 0.06-0.08 um/min over t=60..240; 41-frame GIF.
 - hill_rules: 18 types reading 6 uniform substrates in one run; measured ln(N/N0)/T within 0.012/min of the three formulas (worst 0.0041); drawn entirely with lmdraw (rule diagram + chart).
 
-Sweeps use one `_dsl_` block inside an lmscript `fn` with `${}` parameters (one host process per case: PhysiCell's globals allow one simulation per process). `${}` inserts whole numbers as ints, so pass ints and convert with `float()` in the DSL, or nudge lmdraw coordinates off whole numbers. The DSL has no arrays or ternary. lmscript `system` defaults to a 60 s timeout; `tumour_render` passes an explicit timeout to the lmblender call. Plain lmscript has no float() or ln(): use num() and a series ln.
+Sweeps use one `_lmcode_` block inside an lmscript `fn` with `${}` parameters (one host process per case: PhysiCell's globals allow one simulation per process). `${}` inserts whole numbers as ints, so pass ints and convert with `float()` in the DSL, or nudge lmdraw coordinates off whole numbers. The DSL has no arrays or ternary. lmscript `system` defaults to a 60 s timeout; `tumour_render` passes an explicit timeout to the lmblender call. Plain lmscript has no float() or ln(): use num() and a series ln.

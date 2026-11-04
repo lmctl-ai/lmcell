@@ -14,7 +14,7 @@ for path in re.findall(r'\]\((docs/images/[^)]+)\)',s):
  assert (r/path).is_file(), f"Missing image {path}"
 for p in (r/'examples').glob('*.lms'):
  text=p.read_text(encoding="utf-8")
- assert any(f'cli="{h}" install="github:lmctl-ai/{h}@latest"' in text for h in ('lmplot','lmdraw','lmblender','lmcad')),p
+ assert any(f'cli="{h}"' in text for h in ('lmplot','lmdraw','lmblender','lmcad')),p
  assert 'examples/render-' not in text and 'examples/visuals' not in text,p
  assert 'images/'+p.stem+'.png' in text,p
  assert (r/'docs/images'/(p.stem+'.png')).is_file(),p

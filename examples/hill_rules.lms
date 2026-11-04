@@ -29,10 +29,9 @@ cell.assert_close(float(r.live_of("tow5")),cell.eval("1000*exp(8*0.12*16/17)"),1
 cell.assert_true(r.live_of("tow0")==1000);
 r.type_counts().save_csv("build/examples/hill_rules_counts.csv");
 end _lmcode_
-savedsl(p, "build/hill_rules.dslb");
-r = system ${dsl_cli(p)} --lmcode build/hill_rules.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(p);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 
 # Measured rates from the last row of the per-type counts (time, then types in declaration order).
 fn ln(x) { let y = (x - 1.0) / (x + 1.0); let term = y; let total = 0.0; for (k in range(0, 400)) { total = total + term / (2 * k + 1); term = term * y * y; if (abs(term) < 0.000000000001) { break; } } return 2.0 * total; }
@@ -84,7 +83,7 @@ worst_txt = sprintf("largest deviation %.4f /min (Poisson noise, 1000 cells)", w
 mkdir("build/visual");
 mkdir("build/rendered");
 mkdir("images");
-v = _lmcode_ cli="lmdraw" install="github:lmctl-ai/lmdraw@latest";
+v = _lmcode_ cli="lmdraw";
 scene.canvas(900, 560, "#ffffff");
 scene.text(40.0, 44.0, 22.0, "One signal, three rule forms: what a Hill rule does to a rate", "#1f2933").set_attr("font-weight", "700");
 scene.text(40.0, 70.0, 13.5, "Lines: the formula. Dots: growth rate measured from 1000 simulated cells per point (ln(N/N0)/T over 8 min).", "#52606d");
@@ -160,9 +159,8 @@ scene.text(700.0, ${fl(gy(0.034))}, 12.0, "decreases, r₀ = 0.10", "#3f4a8a");
 scene.text(690.0, ${fl(gy(0.135))}, 12.0, "toward 0.12 from r₀ = 0", "#006066");
 scene.render_png("build/rendered/hill_rules.png", 900, 560, 1);
 end _lmcode_
-savedsl(v,"build/visual/hill_rules.dslb");
-r = system ${dsl_cli(v)} --lmcode build/visual/hill_rules.dslb;
-if (r.code!=0) { println(r.stdout); println(r.stderr); }
-assert(r.code==0);
+r = run_lmcode(v);
+if (!r.ok) { println(json_stringify(r)); }
+assert(r.ok);
 copy_file("build/rendered/hill_rules.png", "images/hill_rules.png");
 println("wrote images/hill_rules.png");
